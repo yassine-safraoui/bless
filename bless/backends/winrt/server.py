@@ -443,7 +443,18 @@ class BlessServerWinRT(BaseBlessServer):
             Additional arguments to use for the subscription
         """
         clients = sender.subscribed_clients
+
+        # Handle Callbacks
+        if clients is not None:
+            if len(list(clients)) > len(self._subscribed_clients):
+                self.subscribe_request(str(sender.uuid))
+            elif len(list(clients)) < len(self._subscribed_clients):
+                self.unsubscribe_request(str(sender.uuid))
+
+        # Update Subscribed Clients
         self._subscribed_clients = list(clients) if clients is not None else []
+
+        # Process MTU
         if self._subscribed_clients:
             mtu_values = [
                 int(client.max_pdu_size)

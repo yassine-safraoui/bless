@@ -1,7 +1,10 @@
 import os
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
+from warnings import warn
+
 
 if TYPE_CHECKING:
+
     class PeripheralManagerDelegate:  # type: ignore # noqa: F811
         event_loop: Optional["asyncio.AbstractEventLoop"]
         peripheral_manager: Any
@@ -14,39 +17,43 @@ if TYPE_CHECKING:
         pyobjc_classMethods: Any
 
         @classmethod
-        def alloc(cls) -> "PeripheralManagerDelegate":
-            ...
+        def alloc(cls) -> "PeripheralManagerDelegate": ...
 
-        def init(self: "PeripheralManagerDelegate"):
-            ...
+        def init(
+            self: "PeripheralManagerDelegate",
+            server: Optional[Any] = None,
+            callbacks: Optional[Dict[str, Callable[..., Any]]] = None,
+        ) -> "PeripheralManagerDelegate": ...
 
         async def start_advertising(
             self, advertisement_data: Dict[str, Any], timeout: float = 2.0
-        ) -> None:
-            ...
+        ) -> None: ...
 
-        async def stop_advertising(self) -> None:
-            ...
+        async def stop_advertising(self) -> None: ...
 
-        def is_connected(self) -> bool:
-            ...
+        def is_connected(self) -> bool: ...
 
-        def is_advertising(self) -> bool:
-            ...
+        def is_advertising(self) -> bool: ...
 
-        async def add_service(self, service: Any) -> None:
-            ...
+        async def add_service(self, service: Any) -> None: ...
 
-        def compliant(self) -> bool:
-            ...
+        def compliant(self) -> bool: ...
+
 
 if os.environ.get("BLESS_DOCS_BUILD"):
+
     class PeripheralManagerDelegate:  # type: ignore # noqa: F811
         """
         Stub for documentation builds where CoreBluetooth is unavailable.
         """
 
-        def init(self: "PeripheralManagerDelegate"):
+        def init(
+            self: "PeripheralManagerDelegate",
+            server: Optional[Any] = None,
+            callbacks: Optional[Dict[str, Callable[..., Any]]] = None,
+        ):
+            self.server = server
+            self._callbacks = callbacks or {}
             return self
 
         async def start_advertising(self, advertisement_data, timeout: float = 2.0):
@@ -60,6 +67,7 @@ if os.environ.get("BLESS_DOCS_BUILD"):
 
         def is_advertising(self) -> bool:
             return False
+
 else:
     import objc  # type: ignore
     import asyncio
@@ -92,22 +100,25 @@ else:
     CBPeripheralManagerDelegate = objc.protocolNamed("CBPeripheralManagerDelegate")
 
     class PeripheralManagerDelegate(  # type: ignore # noqa: F811
-            NSObject,
-            protocols=[CBPeripheralManagerDelegate]
-            ):
-        def init(self: "PeripheralManagerDelegate"):
+        NSObject, protocols=[CBPeripheralManagerDelegate]
+    ):
+        def init(
+            self: "PeripheralManagerDelegate",
+            server: Optional[Any] = None,
+            callbacks: Optional[Dict[str, Callable]] = None,
+        ):
             self = objc.super(PeripheralManagerDelegate, self).init()
 
             self.event_loop: Optional[asyncio.AbstractEventLoop] = None
-            self.server: Optional[Any] = None
+            self.server: Optional[Any] = server
 
-            self.peripheral_manager: CBPeripheralManager = (
-                CBPeripheralManager.alloc().initWithDelegate_queue_(
-                    self, dispatch_queue_create(b"BLE", DISPATCH_QUEUE_SERIAL)
-                )
+            self.peripheral_manager: (
+                CBPeripheralManager
+            ) = CBPeripheralManager.alloc().initWithDelegate_queue_(
+                self, dispatch_queue_create(b"BLE", DISPATCH_QUEUE_SERIAL)
             )
 
-            self._callbacks: Dict[str, Callable] = {}
+            self._callbacks: Dict[str, Callable] = callbacks or {}
 
             # Events
             self._powered_on_event: threading.Event = threading.Event()
@@ -365,6 +376,10 @@ else:
                     )
             else:
                 self._central_subscriptions[central_uuid] = [char_uuid]
+            self._callbacks.get("subscribe", lambda x: None)(
+                characteristic.UUID().UUIDString()
+            )
+            self.get_callback("subscribe")(characteristic.UUID().UUIDString())
 
         def peripheralManager_central_didUnsubscribeFromCharacteristic_(  # noqa: N802 E501
             self,
@@ -383,6 +398,8 @@ else:
             if len(self._central_subscriptions[central_uuid]) < 1:
                 del self._central_subscriptions[central_uuid]
 
+            self.get_callback("unsubscribe")(characteristic.UUID().UUIDString())
+
         def peripheralManagerIsReadyToUpdateSubscribers_(  # noqa: N802
             self, peripheral_manager: CBPeripheralManager
         ):
@@ -400,7 +417,7 @@ else:
                 )
             )
             request.setValue_(
-                self.read_request_func(request.characteristic().UUID().UUIDString())
+                self.get_callback("read")(request.characteristic().UUID().UUIDString())
             )
             peripheral_manager.respondToRequest_withResult_(request, CBATTErrorSuccess)
 
@@ -420,8 +437,17 @@ else:
                         value,
                     )
                 )
-                self.write_request_func(char.UUID().UUIDString(), value)
+                self.get_callback("write")(char.UUID().UUIDString(), value)
 
             peripheral_manager.respondToRequest_withResult_(
                 requests[0], CBATTErrorSuccess
             )
+
+        def get_callback(self, callback_name: str) -> Callable:
+            if callback_name not in self._callbacks:
+                warn(
+                    "Callback {} does not exist".format(callback_name),
+                    UserWarning,
+                )
+                return lambda x: None
+            return self._callbacks[callback_name]
