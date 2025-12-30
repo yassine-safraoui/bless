@@ -145,7 +145,7 @@ class BlueZGattCharacteristic(ServiceInterface):
         f = self._service.app.StartNotify
         if f is None:
             raise NotImplementedError()
-        f(self)
+        f(self, {})
         self._service.app.subscribed_characteristics.append(self._uuid)
 
     @method()
@@ -156,7 +156,7 @@ class BlueZGattCharacteristic(ServiceInterface):
         f = self._service.app.StopNotify
         if f is None:
             raise NotImplementedError()
-        f(self)
+        f(self, {})
         self._service.app.subscribed_characteristics.remove(self._uuid)
 
     async def add_descriptor(
