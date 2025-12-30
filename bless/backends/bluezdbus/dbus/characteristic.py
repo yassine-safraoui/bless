@@ -12,7 +12,7 @@ from .descriptor import BlueZGattDescriptor, DescriptorFlags  # type: ignore
 
 if TYPE_CHECKING:
     from bless.backends.bluezdbus.dbus.service import (  # type: ignore # noqa: F401
-        BlueZGattService
+        BlueZGattService,
     )
 
 
@@ -68,10 +68,7 @@ class BlueZGattCharacteristic(ServiceInterface):
         self._service: "BlueZGattService" = service  # noqa: F821
 
         self._value: bytes = b""
-        self._notifying: bool = (
-            "notify" in self._flags
-            or "indicate" in self._flags
-        )
+        self._notifying: bool = "notify" in self._flags or "indicate" in self._flags
         self.descriptors: List["BlueZGattDescriptor"] = []  # noqa: F821
 
         super(BlueZGattCharacteristic, self).__init__(self.interface_name)
@@ -91,9 +88,7 @@ class BlueZGattCharacteristic(ServiceInterface):
     @Value.setter  # type: ignore
     def Value(self, value: "ay"):  # type: ignore # noqa: F821 N802
         self._value = value
-        self.emit_properties_changed(
-            changed_properties={"Value": self._value}
-        )
+        self.emit_properties_changed(changed_properties={"Value": self._value})
 
     @dbus_property(access=PropertyAccess.READ)
     def Notifying(self) -> "b":  # type: ignore # noqa: F821 N802
@@ -150,7 +145,7 @@ class BlueZGattCharacteristic(ServiceInterface):
         f = self._service.app.StartNotify
         if f is None:
             raise NotImplementedError()
-        f(None)
+        f(self, {})
         self._service.app.subscribed_characteristics.append(self._uuid)
 
     @method()
@@ -161,7 +156,7 @@ class BlueZGattCharacteristic(ServiceInterface):
         f = self._service.app.StopNotify
         if f is None:
             raise NotImplementedError()
-        f(None)
+        f(self, {})
         self._service.app.subscribed_characteristics.remove(self._uuid)
 
     async def add_descriptor(
@@ -180,9 +175,7 @@ class BlueZGattCharacteristic(ServiceInterface):
             The descriptor's value
         """
         index: int = len(self.descriptors) + 1
-        descriptor: BlueZGattDescriptor = BlueZGattDescriptor(
-            uuid, flags, index, self
-        )
+        descriptor: BlueZGattDescriptor = BlueZGattDescriptor(uuid, flags, index, self)
         descriptor._value = value  # type: ignore
         self.descriptors.append(descriptor)
         await self._service.app._register_object(descriptor)
@@ -198,6 +191,4 @@ class BlueZGattCharacteristic(ServiceInterface):
         Dict
             The dictionary that describes the characteristic
         """
-        return {
-            "UUID": Variant('s', self._uuid)
-        }
+        return {"UUID": Variant("s", self._uuid)}

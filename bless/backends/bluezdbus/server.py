@@ -68,10 +68,8 @@ class BlessServerBlueZDBus(BaseBlessServer):
 
         self.app.Read = self.read
         self.app.Write = self.write
-
-        # We don't need to define these
-        self.app.StartNotify = lambda x: None
-        self.app.StopNotify = lambda x: None
+        self.app.StartNotify = self.subscribe
+        self.app.StopNotify = self.unsubscribe
 
         potential_adapter: Optional[ProxyObject] = await get_adapter(
             self.bus, self._adapter
@@ -248,8 +246,8 @@ class BlessServerBlueZDBus(BaseBlessServer):
             service.get_characteristic(std_char_uuid),
         )
         std_desc_uuid = normalize_uuid_str(desc_uuid)
-        descriptor: BlessGATTDescriptorBlueZDBus = (
-            BlessGATTDescriptorBlueZDBus(std_desc_uuid, properties, permissions, value)
+        descriptor: BlessGATTDescriptorBlueZDBus = BlessGATTDescriptorBlueZDBus(
+            std_desc_uuid, properties, permissions, value
         )
 
         await descriptor.init(characteristic)
@@ -333,3 +331,31 @@ class BlessServerBlueZDBus(BaseBlessServer):
             The value being requested to set
         """
         return self.write_request(char.UUID, bytearray(value), options)
+
+    def subscribe(self, char: BlueZGattCharacteristic, options: Dict[str, Any]):
+        """
+        Subscribe request.
+        This function re-routes the subscribe request sent from the
+        BlueZGattApplication to the server function for re-route to the user
+        defined handler
+
+        Parameters
+        ----------
+        char : BlueZGattCharacteristic
+            The characteristic object involved in the request
+        """
+        return self.subscribe_request(char.UUID, options)
+
+    def unsubscribe(self, char: BlueZGattCharacteristic, options: Dict[str, Any]):
+        """
+        Unsubscribe request.
+        This function re-routes the unsubscribe request sent from the
+        BlueZGattApplication to the server function for re-route to the user
+        defined handler
+
+        Parameters
+        ----------
+        char : BlueZGattCharacteristic
+            The characteristic object involved in the request
+        """
+        return self.unsubscribe_request(char.UUID, options)

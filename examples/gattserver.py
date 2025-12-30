@@ -2,6 +2,7 @@
 Example for a BLE 4.0 Server using a GATT dictionary of services and
 characteristics
 """
+
 import sys
 import logging
 import asyncio
@@ -26,17 +27,25 @@ else:
     trigger = asyncio.Event()
 
 
-def read_request(characteristic: BlessGATTCharacteristic, **kwargs) -> bytearray:
+def on_read(characteristic: BlessGATTCharacteristic, **kwargs) -> bytearray:
     logger.debug(f"Reading {characteristic.value}")
     return characteristic.value
 
 
-def write_request(characteristic: BlessGATTCharacteristic, value: Any, **kwargs):
+def on_write(characteristic: BlessGATTCharacteristic, value: Any, **kwargs):
     characteristic.value = value
     logger.debug(f"Char value set to {characteristic.value}")
     if characteristic.value == b"\x0f":
         logger.debug("Nice")
         trigger.set()
+
+
+def on_subscribe(characteristic: BlessGATTCharacteristic, **kwargs):
+    logger.debug(f"Subscribed to {characteristic.uuid}")
+
+
+def on_unsubscribe(characteristic: BlessGATTCharacteristic, **kwargs):
+    logger.debug(f"Unsubscribed from {characteristic.uuid}")
 
 
 async def run(loop):
@@ -68,8 +77,10 @@ async def run(loop):
     }
     my_service_name = "Test Service"
     server = BlessServer(name=my_service_name, loop=loop)
-    server.read_request_func = read_request
-    server.write_request_func = write_request
+    server.on_read = on_read
+    server.on_write = on_write
+    server.on_subscribe = on_subscribe
+    server.on_unsubscribe = on_unsubscribe
 
     await server.add_gatt(gatt)
     await server.start()

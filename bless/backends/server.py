@@ -290,9 +290,6 @@ class BaseBlessServer(abc.ABC):
         characteristics owned by our server. This function then hands off
         execution to the user-defiend callback functions
 
-        Note: read_request_func must be defined on the class that inherits this
-        base class
-
         Parameters
         ----------
         uuid : str
@@ -314,14 +311,15 @@ class BaseBlessServer(abc.ABC):
         if not characteristic:
             raise BlessError("Invalid characteristic: {}".format(uuid))
 
-        return self.read_request_func(characteristic)
+        return self.on_read(characteristic)
 
-    def write_request(self, uuid: str, value: Any, options: Optional[Dict] = None):
+    def write_request(
+        self, uuid: str, value: Any, options: Optional[Dict] = None
+    ) -> None:
         """
         Obtain the characteristic to write and pass on to the user-defined
-        write_request_func
+        on_write
 
-        Note: write_request_func must be defined on the child class
         """
         if options is not None:
             self._update_mtu_from_options(options)
@@ -329,7 +327,101 @@ class BaseBlessServer(abc.ABC):
             uuid
         )
 
-        self.write_request_func(characteristic, value)
+        self.on_write(characteristic, value)
+
+    def subscribe_request(self, uuid: str, options: Optional[Dict] = None) -> None:
+        """
+        Obtain the characteristic to subscribe to and pass on to the
+        user-defined on_subscribe
+        """
+        if options is not None:
+            self._update_mtu_from_options(options)
+        characteristic: Optional[BlessGATTCharacteristic] = self.get_characteristic(
+            uuid
+        )
+
+        self.on_subscribe(characteristic)
+
+    def unsubscribe_request(self, uuid: str, options: Optional[Dict] = None) -> None:
+        """
+        Obtain the characteristic to unsubscribe from and pass on to the
+        user-defined on_unsubscribe
+        """
+        if options is not None:
+            self._update_mtu_from_options(options)
+        characteristic: Optional[BlessGATTCharacteristic] = self.get_characteristic(
+            uuid
+        )
+
+        self.on_unsubscribe(characteristic)
+
+    @property
+    def on_read(self) -> Callable[[Any], Any]:
+        """
+        Alias for `read_request_func`.
+        """
+        func: Optional[Callable[[Any], Any]] = self._callbacks.get("read")
+        if func is not None:
+            return func
+        else:
+            raise BlessError("Server: Read Callback is undefined")
+
+    @on_read.setter
+    def on_read(self, func: Callable):
+        """
+        Alias for `read_request_func`.
+        """
+        self._callbacks["read"] = func
+
+    @property
+    def on_write(self) -> Callable:
+        """
+        Alias for `write_request_func`.
+        """
+        func: Optional[Callable[[Any], Any]] = self._callbacks.get("write")
+        if func is not None:
+            return func
+        else:
+            raise BlessError("Server: Write Callback is undefined")
+
+    @on_write.setter
+    def on_write(self, func: Callable):
+        """
+        Alias for `write_request_func`.
+        """
+        self._callbacks["write"] = func
+
+    @property
+    def on_subscribe(self) -> Callable:
+        """
+        Alias for `subscribe_request_func`.
+        """
+        func: Optional[Callable[[Any], Any]] = self._callbacks.get("subscribe")
+        if func is not None:
+            return func
+        else:
+            raise BlessError("Server: Subscribe Callback is undefined")
+
+    @on_subscribe.setter
+    def on_subscribe(self, func: Callable):
+        """ """
+        self._callbacks["subscribe"] = func
+
+    @property
+    def on_unsubscribe(self) -> Callable:
+        """
+        Alias for `unsubscribe_request_func`.
+        """
+        func: Optional[Callable[[Any], Any]] = self._callbacks.get("unsubscribe")
+        if func is not None:
+            return func
+        else:
+            raise BlessError("Server: Unsubscribe Callback is undefined")
+
+    @on_unsubscribe.setter
+    def on_unsubscribe(self, func: Callable):
+        """ """
+        self._callbacks["unsubscribe"] = func
 
     @property
     def read_request_func(self) -> Callable[[Any], Any]:
@@ -374,42 +466,6 @@ class BaseBlessServer(abc.ABC):
         This will be deprecated in version 0.4. Prefer using `on_write`.
         """
         self.on_write = func
-
-    @property
-    def on_read(self) -> Callable[[Any], Any]:
-        """
-        Alias for `read_request_func`.
-        """
-        func: Optional[Callable[[Any], Any]] = self._callbacks.get("read")
-        if func is not None:
-            return func
-        else:
-            raise BlessError("Server: Read Callback is undefined")
-
-    @on_read.setter
-    def on_read(self, func: Callable):
-        """
-        Alias for `read_request_func`.
-        """
-        self._callbacks["read"] = func
-
-    @property
-    def on_write(self) -> Callable:
-        """
-        Alias for `write_request_func`.
-        """
-        func: Optional[Callable[[Any], Any]] = self._callbacks.get("write")
-        if func is not None:
-            return func
-        else:
-            raise BlessError("Server: Write Callback is undefined")
-
-    @on_write.setter
-    def on_write(self, func: Callable):
-        """
-        Alias for `write_request_func`.
-        """
-        self._callbacks["write"] = func
 
     @property
     def mtu(self) -> Optional[int]:

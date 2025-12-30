@@ -57,8 +57,12 @@ class BlueZGattApplication(ServiceInterface):
         self.Write: Optional[
             Callable[[BlueZGattCharacteristic, bytes, Dict[str, Any]], None]
         ] = None
-        self.StartNotify: Optional[Callable[[None], None]] = None
-        self.StopNotify: Optional[Callable[[None], None]] = None
+        self.StartNotify: Optional[
+            Callable[[BlueZGattCharacteristic, Dict[str, Any]], None]
+        ] = None
+        self.StopNotify: Optional[
+            Callable[[BlueZGattCharacteristic, Dict[str, Any]], None]
+        ] = None
 
         self.subscribed_characteristics: List[str] = []
 
