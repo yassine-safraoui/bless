@@ -1,6 +1,7 @@
 """
 Example for a BLE 4.0 Server
 """
+
 import sys
 import logging
 import asyncio
@@ -58,7 +59,7 @@ async def run(loop):
         | GATTCharacteristicProperties.write
         | GATTCharacteristicProperties.indicate
     )
-    permissions = GATTAttributePermissions.readable | GATTAttributePermissions.writeable
+    permissions = GATTAttributePermissions.readable | GATTAttributePermissions.writable
     await server.add_new_characteristic(
         my_service_uuid, my_char_uuid, char_flags, None, permissions
     )

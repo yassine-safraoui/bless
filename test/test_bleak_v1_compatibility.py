@@ -54,7 +54,7 @@ class TestBleakV1Compatibility:
             | GATTCharacteristicProperties.notify
         )
         permissions = (
-            GATTAttributePermissions.readable | GATTAttributePermissions.writeable
+            GATTAttributePermissions.readable | GATTAttributePermissions.writable
         )
 
         await server.add_new_characteristic(
@@ -114,7 +114,7 @@ class TestBleakV1Compatibility:
                     ),
                     "Permissions": (
                         GATTAttributePermissions.readable
-                        | GATTAttributePermissions.writeable
+                        | GATTAttributePermissions.writable
                     ),
                     "Value": bytearray(b"test"),
                 }
@@ -142,7 +142,7 @@ class TestBleakV1Compatibility:
             GATTCharacteristicProperties.read | GATTCharacteristicProperties.write
         )
         permissions = (
-            GATTAttributePermissions.readable | GATTAttributePermissions.writeable
+            GATTAttributePermissions.readable | GATTAttributePermissions.writable
         )
 
         await server.add_new_characteristic(
@@ -175,7 +175,7 @@ class TestBleakV1Compatibility:
             | GATTCharacteristicProperties.notify
         )
         permissions = (
-            GATTAttributePermissions.readable | GATTAttributePermissions.writeable
+            GATTAttributePermissions.readable | GATTAttributePermissions.writable
         )
 
         await server.add_new_characteristic(

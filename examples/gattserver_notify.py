@@ -2,6 +2,7 @@
 Example for a BLE 4.0 Server using a GATT dictionary of services and
 characteristics, plus explicit notifications to subscribed centrals.
 """
+
 import sys
 import logging
 import asyncio
@@ -54,7 +55,7 @@ async def run(loop):
                 ),
                 "Permissions": (
                     GATTAttributePermissions.readable
-                    | GATTAttributePermissions.writeable
+                    | GATTAttributePermissions.writable
                 ),
                 "Value": None,
             }

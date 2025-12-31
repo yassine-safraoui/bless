@@ -22,7 +22,7 @@ Create a server, add a GATT tree, then start advertising:
                    ),
                    "Permissions": (
                        GATTAttributePermissions.readable
-                       | GATTAttributePermissions.writeable
+                       | GATTAttributePermissions.writable
                    ),
                    "Value": None,
                }

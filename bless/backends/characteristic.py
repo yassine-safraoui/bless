@@ -58,7 +58,7 @@ def _properties_to_bleak(
 
 class BlessGATTCharacteristic(BleakGATTCharacteristic):
     """
-    Extension of the BleakGATTCharacteristic to allow for writeable values
+    Extension of the BleakGATTCharacteristic to allow for writable values
     """
 
     def __init__(
@@ -66,7 +66,7 @@ class BlessGATTCharacteristic(BleakGATTCharacteristic):
         uuid: Union[str, UUID],
         properties: GATTCharacteristicProperties,
         permissions: GATTAttributePermissions,
-        value: Optional[bytearray]
+        value: Optional[bytearray],
     ):
         """
         Instantiates a new GATT Characteristic but is not yet assigned to any

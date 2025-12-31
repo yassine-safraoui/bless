@@ -107,9 +107,7 @@ class TestServiceProvider:
             if args.status == 2:
                 start_event.set()
 
-        def read(
-                sender: GattLocalCharacteristic,
-                args: GattReadRequestedEventArgs):
+        def read(sender: GattLocalCharacteristic, args: GattReadRequestedEventArgs):
             print("Read")
             deferral: Deferral = args.get_deferral()
             value = self.val
@@ -120,13 +118,12 @@ class TestServiceProvider:
             async def f():
                 nonlocal request
                 request = await args.get_request_async()
+
             asyncio.run(f())
             request.respond_with_value(writer.detach_buffer())
             deferral.complete()
 
-        def write(
-                sender: GattLocalCharacteristic,
-                args: GattWriteRequestedEventArgs):
+        def write(sender: GattLocalCharacteristic, args: GattWriteRequestedEventArgs):
             print("WRITE")
             deferral: Deferral = args.get_deferral()
             request: GattWriteRequest
@@ -134,6 +131,7 @@ class TestServiceProvider:
             async def f():
                 nonlocal request
                 request = await args.get_request_async()
+
             asyncio.run(f())
             reader: DataReader = DataReader.from_buffer(request.value)
             n_bytes: int = reader.unconsumed_buffer_length
@@ -156,9 +154,7 @@ class TestServiceProvider:
         service_provider_result: GattServiceProviderResult = (
             await GattServiceProvider.create_async(service_uuid)
         )
-        service_provider: GattServiceProvider = (
-                service_provider_result.service_provider
-                )
+        service_provider: GattServiceProvider = service_provider_result.service_provider
         service_provider.add_advertisement_status_changed(advertisement_status_changed)
 
         new_service: GattLocalService = service_provider.service
@@ -173,8 +169,7 @@ class TestServiceProvider:
         )
 
         permissions: GATTAttributePermissions = (
-            GATTAttributePermissions.readable |
-            GATTAttributePermissions.writeable
+            GATTAttributePermissions.readable | GATTAttributePermissions.writable
         )
 
         read_parameters: GattLocalCharacteristicParameters = (

@@ -85,7 +85,7 @@ class TestBlessServer:
         )
         value: Optional[bytearray] = None
         permissions: GATTAttributePermissions = (
-            GATTAttributePermissions.readable | GATTAttributePermissions.writeable
+            GATTAttributePermissions.readable | GATTAttributePermissions.writable
         )
 
         if use_encrypted:
