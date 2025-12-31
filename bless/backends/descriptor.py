@@ -26,7 +26,7 @@ class GATTDescriptorProperties(Flag):
 
 class BlessGATTDescriptor(BleakGATTDescriptor):
     """
-    Extension of the BleakGATTDescriptor to allow for writeable values
+    Extension of the BleakGATTDescriptor to allow for writable values
     """
 
     def __init__(
@@ -34,7 +34,7 @@ class BlessGATTDescriptor(BleakGATTDescriptor):
         uuid: Union[str, UUID],
         properties: GATTDescriptorProperties,
         permissions: GATTAttributePermissions,
-        value: Optional[bytearray]
+        value: Optional[bytearray],
     ):
         """
         Instantiates a new GATT Descriptor but is not yet assigned to any
