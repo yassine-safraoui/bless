@@ -80,7 +80,9 @@ class BlueZGattApplication(ServiceInterface):
             return
         message = (
             "BlueZ utilities not found (bluetoothd/bluetoothctl). "
-            "Install BlueZ to use the Linux backend."
+            "Install BlueZ to use the Linux backend. On Debian/Ubuntu: "
+            "`sudo apt-get install bluez`. On Raspberry Pi, you may also want "
+            "`pi-bluetooth`."
         )
         warnings.warn(message, RuntimeWarning)
         LOGGER.warning(message)
