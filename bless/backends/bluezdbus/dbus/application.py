@@ -1,4 +1,7 @@
+import logging
 import re
+import shutil
+import warnings
 
 import bleak.backends.bluezdbus.defs as defs  # type: ignore
 
@@ -20,6 +23,8 @@ from bless.backends.bluezdbus.dbus.characteristic import (  # type: ignore
 )
 from bless.backends.bluezdbus.dbus.descriptor import BlueZGattDescriptor  # type: ignore
 
+LOGGER = logging.getLogger(__name__)
+
 
 class BlueZGattApplication(ServiceInterface):
     """
@@ -39,6 +44,7 @@ class BlueZGattApplication(ServiceInterface):
         bus : MessageBus
             The dbus_next connection
         """
+        self._ensure_bluez_available()
         self.path: str = "/"
         self.app_name: str = name
         self.destination: str = destination
@@ -67,6 +73,20 @@ class BlueZGattApplication(ServiceInterface):
         self.subscribed_characteristics: List[str] = []
 
         super(BlueZGattApplication, self).__init__(self.destination)
+
+    @staticmethod
+    def _ensure_bluez_available() -> None:
+        if shutil.which("bluetoothd") or shutil.which("bluetoothctl"):
+            return
+        message = (
+            "BlueZ utilities not found (bluetoothd/bluetoothctl). "
+            "Install BlueZ to use the Linux backend. On Debian/Ubuntu: "
+            "`sudo apt-get install bluez`. On Raspberry Pi, you may also want "
+            "`pi-bluetooth`."
+        )
+        warnings.warn(message, RuntimeWarning)
+        LOGGER.warning(message)
+        raise RuntimeError("BlueZ is not available on this system")
 
     async def add_service(self, uuid: str) -> BlueZGattService:  # noqa: F821
         """
