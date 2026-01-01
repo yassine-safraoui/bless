@@ -26,7 +26,7 @@ from bless.backends.characteristic import (  # noqa: E402
     GATTCharacteristicProperties,
 )
 
-hardware_only = pytest.mark.skipif("os.environ.get('TEST_HARDWARE') is None")
+hardware_only = pytest.mark.skipif("os.environ.get('TEST_HARDWARE') != '1'")
 use_encrypted = os.environ.get("TEST_ENCRYPTED") is not None
 
 
