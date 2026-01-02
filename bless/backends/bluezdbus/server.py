@@ -344,6 +344,7 @@ class BlessServerBlueZDBus(BaseBlessServer):
         char : BlueZGattCharacteristic
             The characteristic object involved in the request
         """
+        options["central_id"] = options.get("device")
         return self.subscribe_request(char.UUID, options)
 
     def unsubscribe(self, char: BlueZGattCharacteristic, options: Dict[str, Any]):
@@ -358,4 +359,5 @@ class BlessServerBlueZDBus(BaseBlessServer):
         char : BlueZGattCharacteristic
             The characteristic object involved in the request
         """
+        options["central_id"] = options.get("device")
         return self.unsubscribe_request(char.UUID, options)

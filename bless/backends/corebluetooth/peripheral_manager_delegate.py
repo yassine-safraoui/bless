@@ -376,10 +376,8 @@ else:
                     )
             else:
                 self._central_subscriptions[central_uuid] = [char_uuid]
-            self._callbacks.get("subscribe", lambda x: None)(
-                characteristic.UUID().UUIDString()
-            )
-            self.get_callback("subscribe")(characteristic.UUID().UUIDString())
+            options = {"central_id": central_uuid}
+            self.get_callback("subscribe")(char_uuid, options)
 
         def peripheralManager_central_didUnsubscribeFromCharacteristic_(  # noqa: N802 E501
             self,
@@ -398,7 +396,8 @@ else:
             if len(self._central_subscriptions[central_uuid]) < 1:
                 del self._central_subscriptions[central_uuid]
 
-            self.get_callback("unsubscribe")(characteristic.UUID().UUIDString())
+            options = {"central_id": central_uuid}
+            self.get_callback("unsubscribe")(char_uuid, options)
 
         def peripheralManagerIsReadyToUpdateSubscribers_(  # noqa: N802
             self, peripheral_manager: CBPeripheralManager
@@ -449,5 +448,5 @@ else:
                     "Callback {} does not exist".format(callback_name),
                     UserWarning,
                 )
-                return lambda x: None
+                return lambda *args, **kwargs: None
             return self._callbacks[callback_name]

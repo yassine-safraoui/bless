@@ -37,6 +37,7 @@ class BaseBlessServer(abc.ABC):
 
         self.services: Dict[str, BlessGATTService] = {}
         self._mtu: Optional[int] = None
+        self._subscriptions: Dict[str, List[Optional[str]]] = {}
 
     # Async Context managers
 
@@ -336,6 +337,10 @@ class BaseBlessServer(abc.ABC):
         """
         if options is not None:
             self._update_mtu_from_options(options)
+            subscribed_centrals: List[Optional[str]] = self._subscriptions.setdefault(
+                self._normalize_uuid(uuid), []
+            )
+            subscribed_centrals = [*subscribed_centrals, options.get("centrial_id")]
         characteristic: Optional[BlessGATTCharacteristic] = self.get_characteristic(
             uuid
         )
@@ -349,6 +354,12 @@ class BaseBlessServer(abc.ABC):
         """
         if options is not None:
             self._update_mtu_from_options(options)
+            subscribed_centrals: List[Optional[str]] = self._subscriptions.setdefault(
+                self._normalize_uuid(uuid), []
+            )
+            subscribed_centrals = [
+                cid for cid in subscribed_centrals if cid != options.get("central_id")
+            ]
         characteristic: Optional[BlessGATTCharacteristic] = self.get_characteristic(
             uuid
         )
@@ -496,6 +507,36 @@ class BaseBlessServer(abc.ABC):
         mtu_value = self._coerce_mtu_value(options.get("mtu"))
         if mtu_value is not None:
             self._mtu = mtu_value
+
+    @property
+    def subscriptions(self) -> Dict[str, List[Optional[str]]]:
+        """
+        Mapping of characteristic UUIDs to subscribed client IDs.
+        """
+        return self._subscriptions
+
+    @property
+    def subscribed_centrals(self) -> List[Optional[str]]:
+        """
+        Unique list of subscribed central IDs across all characteristics.
+        """
+        centrals: List[Optional[str]] = []
+        for central_ids in self._subscriptions.values():
+            centrals.extend(central_ids)
+        return list(dict.fromkeys(centrals))
+
+    @property
+    def subscribed_clients(self) -> List[Optional[str]]:
+        """
+        Alias for `subscribed_centrals`.
+        """
+        return self.subscribed_centrals
+
+    def _normalize_uuid(self, uuid: str) -> str:
+        try:
+            return str(UUID(uuid))
+        except ValueError:
+            return uuid
 
     @staticmethod
     def is_uuid(uuid: str) -> bool:
