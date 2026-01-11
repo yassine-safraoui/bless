@@ -232,7 +232,7 @@ class BlessServerWinRT(BaseBlessServer):
         if args is not None and args.status == 2:
             self._advertising_started.set()
 
-    async def add_new_service(self, uuid: str):
+    async def add_new_service(self, uuid: str, primary: Optional[bool] = None):
         """
         Generate a new service to be associated with the server
 
@@ -240,10 +240,15 @@ class BlessServerWinRT(BaseBlessServer):
         ----------
         uuid : str
             The string representation of the UUID of the service to be added
+        primary : Optional[bool]
+            True if this is a primary service, False otherwise. If None, default
+            behavior of the backend is used.
+            For WinRT, it seems to only allow primary services to be added so this
+            is currently unused.           
         """
         logger.debug("Creating a new service with uuid: {}".format(uuid))
         logger.debug("Adding service to server with uuid {}".format(uuid))
-        service: BlessGATTServiceWinRT = BlessGATTServiceWinRT(uuid)
+        service: BlessGATTServiceWinRT = BlessGATTServiceWinRT(uuid, primary)
         await service.init(self)
         self.services[service.uuid] = service
 

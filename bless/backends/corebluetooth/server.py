@@ -171,7 +171,7 @@ class BlessServerCoreBluetooth(BaseBlessServer):
         """
         return self.peripheral_manager_delegate.is_advertising() == 1
 
-    async def add_new_service(self, uuid: str):
+    async def add_new_service(self, uuid: str, primary: Optional[bool] = None):
         """
         Add a service and all it's characteristics to be advertised
 
@@ -179,9 +179,12 @@ class BlessServerCoreBluetooth(BaseBlessServer):
         ----------
         uuid : str
             The string representation of the UUID of the service to be added
+        primary : Optional[bool]
+            True if this is a primary service, False otherwise. If None, default
+            behavior of the backend is used which is that all services are primary.
         """
         logger.debug("Creating a new service with uuid: {}".format(uuid))
-        service: BlessGATTServiceCoreBluetooth = BlessGATTServiceCoreBluetooth(uuid)
+        service: BlessGATTServiceCoreBluetooth = BlessGATTServiceCoreBluetooth(uuid, primary)
         await service.init(self)
         self.services[service.uuid] = service
 

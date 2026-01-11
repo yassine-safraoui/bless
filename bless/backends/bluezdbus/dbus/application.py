@@ -88,7 +88,7 @@ class BlueZGattApplication(ServiceInterface):
         LOGGER.warning(message)
         raise RuntimeError("BlueZ is not available on this system")
 
-    async def add_service(self, uuid: str) -> BlueZGattService:  # noqa: F821
+    async def add_service(self, uuid: str, primary: Optional[bool] = None) -> BlueZGattService:  # noqa: F821
         """
         Add a service to the application
         The first service to be added will be the primary service
@@ -97,6 +97,9 @@ class BlueZGattApplication(ServiceInterface):
         ----------
         uuid : str
             The string representation of the uuid for the service to create
+        primary : Optional[bool]
+            True if this is a primary service, False otherwise. If None,
+            the first service added will be primary, all others will be secondary
 
         Returns
         -------
@@ -104,7 +107,7 @@ class BlueZGattApplication(ServiceInterface):
             Returns and instance of the service object
         """
         index: int = len(self.services) + 1
-        primary: bool = index == 1
+        primary: bool = primary if primary is not None else index == 1
         service: BlueZGattService = BlueZGattService(uuid, primary, index, self)
         self.services.append(service)
         self.bus.export(service.path, service)
