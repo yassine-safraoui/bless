@@ -10,61 +10,62 @@ from dbus_next.aio import ProxyInterface, ProxyObject, MessageBus
 from dbus_next.introspection import Interface, Node
 from select import poll, POLLHUP, POLLERR, POLLNVAL
 from socket import socket, socketpair, AF_UNIX, SOCK_SEQPACKET
-from typing import Callable, Optional
+from typing import Callable, Coroutine, Optional, Union
 
 from .device import Device1
 
 logger = logging.getLogger(name=__name__)
 
+DisconnectCallback = Union[
+    Callable[["NotifySession"], None],
+    Callable[["NotifySession"], Coroutine]
+]
+
 
 class NotifySession:
-    def __init__(self, device_path: str, mtu: int, bus: MessageBus, on_disconnect: Callable[["NotifySession"], None], loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()):
+    def __init__(
+        self,
+        device_path: str,
+        mtu: int,
+        bus: MessageBus,
+        on_disconnect: DisconnectCallback,
+        loop: asyncio.AbstractEventLoop = asyncio.get_event_loop(),
+    ):
         self.device_path: str = device_path
         self.mtu: int = mtu
         self.bus: MessageBus = bus
-        self.disconnect_callback: Callable[["NotifySession"], None] = on_disconnect
+        self.disconnect_callback: DisconnectCallback = on_disconnect
         self.loop: AbstractEventLoop = loop
-        self.closed = asyncio.Event()
+        self.closed: Event = Event()
 
         self._tx: Optional[socket] = None
         self._device: Optional[ProxyInterface] = None
 
     def get_device(self) -> ProxyInterface:
+        if self._device is None:
+            raise Exception(
+                "NotifySession not started. Device properties not obtained"
+            )
+
         return self._device
 
     async def get_device_address(self) -> str:
         return await self._device.get_address()  # type: ignore
 
     async def watch_fd(self) -> None:
+        if self._tx is None:
+            raise Exception(
+                "NotifySession not started. Transmission socket not open"
+            )
         fd: int = self._tx.fileno()
         p: poll = poll()
         p.register(fd, POLLHUP | POLLERR | POLLNVAL)
 
         while not self.closed.is_set():
             events = await asyncio.to_thread(p.poll, 500)
-            for (ev_fd, ev) in events:
+            for ev_fd, ev in events:
                 if ev & (POLLHUP | POLLERR | POLLNVAL):
                     self.close()
-
-
-    def _on_fd_readable(self):
-        """
-        For BlueZ AcquireNotify, readability usually means the peer closed
-        (EOF / HUP). Consume/confirm and then close session.
-        """
-        logger.debug("Obtained reading on notifying session")
-        if self._tx is None:
-            return
-        try:
-            data: bytes = self._tx.recv(1024)
-            # Most common: b"" => EOF => unsubscribed/disconnected
-            if len(data) == 0:
-                self.close()
-        except BlockingIOError:
-            return
-        except OSError:
-            # Treat any error as session ended
-            self.close()
 
     async def start(self) -> int:
 
@@ -73,7 +74,9 @@ class NotifySession:
         device_iface: Interface = Device1().introspect()
         node.interfaces.append(device_iface)
 
-        object: ProxyObject = self.bus.get_proxy_object("org.bluez", self.device_path, node)
+        object: ProxyObject = self.bus.get_proxy_object(
+            "org.bluez", self.device_path, node
+        )
         self._device = object.get_interface(defs.DEVICE_INTERFACE)
 
         # create a bluetooth socket pair
@@ -83,8 +86,7 @@ class NotifySession:
         fd_tx: int = self._tx.fileno()
         os.set_blocking(fd_tx, False)
 
-        # Fire when fd becomes readable (EOF/hup)
-        # self.loop.add_reader(fd_tx, self._on_fd_readable)
+        # watch when fd becomes readable (EOF/hup)
         asyncio.create_task(self.watch_fd())
 
         # return the receiving socket
