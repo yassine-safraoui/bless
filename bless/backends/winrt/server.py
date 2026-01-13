@@ -447,13 +447,15 @@ class BlessServerWinRT(BaseBlessServer):
         )
 
         prev_ids: Set[str] = {
-            client.session.device_id for client in self._subscribed_clients
+            str(client.session.device_id.id) for client in self._subscribed_clients
         }
-        new_ids: Set[str] = {client.session.device_id for client in new_clients}
+        new_ids: Set[str] = {str(client.session.device_id.id) for client in new_clients}
 
         # Handle Callbacks
         added = new_ids - prev_ids
         removed = prev_ids - new_ids
+        logger.debug(f"Added: {added}")
+        logger.debug(f"removed: {removed}")
         if added:
             for cid in added:
                 self.subscribe_request(str(sender.uuid), {"central_id": cid})
