@@ -5,7 +5,7 @@ import sys
 from uuid import UUID
 from threading import Event
 from asyncio.events import AbstractEventLoop
-from typing import Optional, List, Any, cast
+from typing import Optional, List, Any, cast, Set
 
 from bless.backends.server import BaseBlessServer  # type: ignore
 from bless.backends.advertisement import BlessAdvertisementData
@@ -369,11 +369,6 @@ class BlessServerWinRT(BaseBlessServer):
         deferral: Optional[Deferral] = args.get_deferral()
         if deferral is None:
             return
-        value: bytearray = self.read_request(str(sender.uuid), {})
-        logger.debug(f"Current Characteristic value {value}")
-        value = value if value is not None else b"\x00"
-        writer: DataWriter = DataWriter()
-        writer.write_bytes(value)
         logger.debug("Getting request object {}".format(self))
         request: GattReadRequest
 
@@ -383,6 +378,11 @@ class BlessServerWinRT(BaseBlessServer):
 
         asyncio.new_event_loop().run_until_complete(f())
         logger.debug("Got request object {}".format(request))
+        value: bytearray = self.read_request(str(sender.uuid), {})
+        logger.debug(f"Current Characteristic value {value}")
+        value = value if value is not None else b"\x00"
+        writer: DataWriter = DataWriter()
+        writer.write_bytes(value)
         request.respond_with_value(writer.detach_buffer())
         deferral.complete()
 
@@ -422,7 +422,7 @@ class BlessServerWinRT(BaseBlessServer):
             value.append(next_byte)
 
         logger.debug("Written Value: {}".format(value))
-        self.write_request(str(sender.uuid), value)
+        self.write_request(str(sender.uuid), value, {})
 
         if request.option == GattWriteOption.WRITE_WITH_RESPONSE:
             request.respond()
@@ -442,17 +442,34 @@ class BlessServerWinRT(BaseBlessServer):
         args : Object
             Additional arguments to use for the subscription
         """
-        clients = sender.subscribed_clients
+        new_clients: List[GattSubscribedClient] = (
+            list([]) if sender.subscribed_clients is None else sender.subscribed_clients
+        )
+
+        prev_ids: Set[str] = {
+            str(client.session.device_id.id) for client in self._subscribed_clients
+        }
+        new_ids: Set[str] = {str(client.session.device_id.id) for client in new_clients}
 
         # Handle Callbacks
-        if clients is not None:
-            if len(list(clients)) > len(self._subscribed_clients):
-                self.subscribe_request(str(sender.uuid))
-            elif len(list(clients)) < len(self._subscribed_clients):
-                self.unsubscribe_request(str(sender.uuid))
+        added = new_ids - prev_ids
+        removed = prev_ids - new_ids
+        logger.debug(f"Added: {added}")
+        logger.debug(f"removed: {removed}")
+        if added:
+            for cid in added:
+                self.subscribe_request(str(sender.uuid), {"central_id": cid})
+        elif len(new_clients) > len(self._subscribed_clients):
+            self.subscribe_request(str(sender.uuid))
+
+        if removed:
+            for cid in removed:
+                self.unsubscribe_request(str(sender.uuid), {"central_id": cid})
+        elif len(new_clients) < len(self._subscribed_clients):
+            self.unsubscribe_request(str(sender.uuid))
 
         # Update Subscribed Clients
-        self._subscribed_clients = list(clients) if clients is not None else []
+        self._subscribed_clients = new_clients
 
         # Process MTU
         if self._subscribed_clients:

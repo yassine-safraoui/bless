@@ -4,7 +4,7 @@ import logging
 
 from uuid import UUID
 from asyncio import AbstractEventLoop
-from typing import Any, Optional, Dict, Callable, List
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from bless.backends.service import BlessGATTService
 from bless.backends.advertisement import BlessAdvertisementData
@@ -83,7 +83,7 @@ class BaseBlessServer(abc.ABC):
     @abc.abstractmethod
     async def is_connected(self) -> bool:
         """
-        Determine whether there are any connected peripheral devices
+        Determine whether there are any connected central devices
 
         Returns
         -------
@@ -334,11 +334,19 @@ class BaseBlessServer(abc.ABC):
         Obtain the characteristic to subscribe to and pass on to the
         user-defined on_subscribe
         """
-        if options is not None:
-            self._update_mtu_from_options(options)
+        LOGGER.debug(f"Subscribe_request\n\tuuid: {uuid}\n\toptions: {options}")
         characteristic: Optional[BlessGATTCharacteristic] = self.get_characteristic(
             uuid
         )
+
+        if characteristic is None:
+            raise BlessError(f"Invalid characteristic: {uuid}")
+
+        if options is not None:
+            self._update_mtu_from_options(options)
+
+            if options.get("central_id") is not None:
+                characteristic.add_subscription(options["central_id"])
 
         self.on_subscribe(characteristic)
 
@@ -347,11 +355,18 @@ class BaseBlessServer(abc.ABC):
         Obtain the characteristic to unsubscribe from and pass on to the
         user-defined on_unsubscribe
         """
-        if options is not None:
-            self._update_mtu_from_options(options)
         characteristic: Optional[BlessGATTCharacteristic] = self.get_characteristic(
             uuid
         )
+
+        if characteristic is None:
+            raise BlessError(f"Invalid characteristic: {uuid}")
+
+        if options is not None:
+            self._update_mtu_from_options(options)
+
+            if options.get("central_id") is not None:
+                characteristic.remove_subscription(options["central_id"])
 
         self.on_unsubscribe(characteristic)
 
@@ -496,6 +511,33 @@ class BaseBlessServer(abc.ABC):
         mtu_value = self._coerce_mtu_value(options.get("mtu"))
         if mtu_value is not None:
             self._mtu = mtu_value
+
+    @property
+    def subscribed_centrals(self) -> Set[str]:
+        """
+        Unique list of subscribed central IDs across all characteristics.
+        """
+        return set(
+            [
+                central_id
+                for service in self.services.values()
+                for characteristic in service.characteristics
+                for central_id in characteristic.subscribed_centrals
+            ]
+        )
+
+    @property
+    def subscribed_clients(self) -> Set[str]:
+        """
+        Alias for `subscribed_centrals`.
+        """
+        return self.subscribed_centrals
+
+    def _normalize_uuid(self, uuid: str) -> str:
+        try:
+            return str(UUID(uuid))
+        except ValueError:
+            return uuid
 
     @staticmethod
     def is_uuid(uuid: str) -> bool:
