@@ -1,19 +1,25 @@
-from enum import Enum
+import asyncio
+import logging
+import os
 
 import bleak.backends.bluezdbus.defs as defs  # type: ignore
 
+from dbus_next import DBusError  # type: ignore
+from dbus_next.constants import PropertyAccess  # type: ignore
+from dbus_next.service import ServiceInterface, method, dbus_property  # type: ignore
+from dbus_next.signature import Variant  # type: ignore
+from enum import Enum
 from typing import List, TYPE_CHECKING, Any, Dict
 
-from dbus_next.service import ServiceInterface, method, dbus_property  # type: ignore
-from dbus_next.constants import PropertyAccess  # type: ignore
-from dbus_next.signature import Variant  # type: ignore
-
 from .descriptor import BlueZGattDescriptor, DescriptorFlags  # type: ignore
+from .session import NotifySession  # type: ignore
 
 if TYPE_CHECKING:
     from bless.backends.bluezdbus.dbus.service import (  # type: ignore # noqa: F401
         BlueZGattService,
     )
+
+logger = logging.getLogger(name=__name__)
 
 
 class Flags(Enum):
@@ -68,7 +74,8 @@ class BlueZGattCharacteristic(ServiceInterface):
         self._service: "BlueZGattService" = service  # noqa: F821
 
         self._value: bytes = b""
-        self._notifying: bool = "notify" in self._flags or "indicate" in self._flags
+        self._notifying_calls: int = 0
+        self._subscribed_centrals: Dict[str, NotifySession] = {}
         self.descriptors: List["BlueZGattDescriptor"] = []  # noqa: F821
 
         super(BlueZGattCharacteristic, self).__init__(self.interface_name)
@@ -87,16 +94,21 @@ class BlueZGattCharacteristic(ServiceInterface):
 
     @Value.setter  # type: ignore
     def Value(self, value: "ay"):  # type: ignore # noqa: F821 N802
+        if isinstance(value, bytearray):
+            value = bytes(value)
         self._value = value
-        self.emit_properties_changed(changed_properties={"Value": self._value})
 
     @dbus_property(access=PropertyAccess.READ)
     def Notifying(self) -> "b":  # type: ignore # noqa: F821 N802
-        return self._notifying
+        return self._notifying_calls > 0 or self.NotifyAcquired
 
     @dbus_property(access=PropertyAccess.READ)  # noqa: F722
     def Flags(self) -> "as":  # type: ignore # noqa: F821 F722 N802
         return self._flags
+
+    @dbus_property(access=PropertyAccess.READ)  # noqa: F722
+    def NotifyAcquired(self) -> "b":  # type: ignore # noqa: F821
+        return len(self._subscribed_centrals) > 0
 
     @method()  # noqa: F722
     def ReadValue(self, options: "a{sv}") -> "ay":  # type: ignore # noqa: F722 F821 N802 E501
@@ -138,26 +150,101 @@ class BlueZGattCharacteristic(ServiceInterface):
         f(self, value, options)
 
     @method()
+    async def AcquireNotify(self, options: "a{sv}") -> "hq":  # type: ignore # noqa
+        """
+        Called when a central device subscribes to the
+        characteristic
+        """
+        mtu: int = options["mtu"].value
+        potential_device: Variant = options["device"]
+        device_path: str = potential_device.value
+
+        # Can only process this if we are not already subscribed
+        if self.Notifying and not self.NotifyAcquired:
+            logger.error("AcquireNotify attempted after StartNotify called")
+            raise DBusError(
+                "org.bluez.Error.NotPermitted", "AcquireNotify not permitted"
+            )
+
+        session: NotifySession = NotifySession(
+            device_path, mtu, self._service.app.bus, self.ReleaseNotify
+        )
+        rx: int = await session.start()
+        address: str = await session.get_device_address()
+        logger.debug(f"AcquireNotify on {self.UUID} from {address} on FD {rx}")
+
+        f = self._service.app.StartNotify
+        if f is None:
+            raise NotImplementedError()
+        f(self, {"device": address})
+        self._subscribed_centrals[address] = session
+
+        async def close_rx():
+            logger.debug("Closing RX")
+            await asyncio.sleep(2)
+            os.close(rx)
+            # asyncio.get_running_loop().call_soon_threadsafe(os.close, rx)
+
+        asyncio.create_task(close_rx())
+        return [rx, mtu]
+
+    async def ReleaseNotify(self, session: NotifySession):
+        address: str = await session.get_device_address()
+        logger.debug(f"ReleaseNotify on {self.UUID} from {address}")
+        f = self._service.app.StopNotify
+        if f is None:
+            raise NotImplementedError()
+        f(self, {"device": address})
+        del self._subscribed_centrals[address]
+
+    @method()
     def StartNotify(self):  # noqa: N802
         """
         Begin a subscription to the characteristic
         """
+        if self.NotifyAcquired:
+            logger.info(
+                "StartNotify called. "
+                + "AcquireNotify already called. "
+                + "Ignoring call to Start Notify"
+            )
+            return
+
+        logger.debug(f"StartNotify on {self.UUID}")
         f = self._service.app.StartNotify
         if f is None:
             raise NotImplementedError()
         f(self, {})
-        self._service.app.subscribed_characteristics.append(self._uuid)
+        self._notifying_calls += 1
 
     @method()
-    def StopNotify(self):  # noqa: N802
+    async def StopNotify(self):  # noqa: N802
         """
         Stop a subscription to the characteristic
         """
+        if self.NotifyAcquired:
+            logger.error("StopNotify called but notifications are aquried!")
+            return
+
         f = self._service.app.StopNotify
         if f is None:
             raise NotImplementedError()
         f(self, {})
-        self._service.app.subscribed_characteristics.remove(self._uuid)
+        self._notifying_calls -= 1
+
+    def update_value(self) -> None:
+        """
+        This method does not actually alter that value of the characteristic,
+        but rather sends updates to subscribed centrals.
+        """
+        if self.NotifyAcquired is True:
+            for central_id, session in self._subscribed_centrals.items():
+                logger.debug(f"Sending update to {central_id}")
+                if not session.send_update(self._value):
+                    logger.warn(f"Failed to send update to {central_id}")
+
+        else:
+            self.emit_properties_changed(changed_properties={"Value": self._value})
 
     async def add_descriptor(
         self, uuid: str, flags: List[DescriptorFlags], value: Any

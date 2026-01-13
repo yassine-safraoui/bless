@@ -26,17 +26,16 @@ from bless.backends.characteristic import (  # noqa: E402
     GATTCharacteristicProperties,
 )
 
-hardware_only = pytest.mark.skipif("os.environ.get('TEST_HARDWARE') != '1'")
+hardware_double = pytest.mark.skipif("os.environ.get('TEST_HARDWARE') != '2'")
 use_encrypted = os.environ.get("TEST_ENCRYPTED") is not None
 
 
-@hardware_only
-class TestBlessServer:
+@hardware_double
+class TestBlessServerMultiClient:
     """
-    Test specification for bleak server
+    Hardware test for two simultaneous connected clients.
 
-    This is a hardware dependent test and will only run when the TEST_HARDWARE
-    environment variable is set
+    Runs when TEST_HARDWARE=2.
     """
 
     def gen_hex_pairs(self) -> str:
@@ -65,7 +64,7 @@ class TestBlessServer:
         return "".join([hex(x)[2:] for x in b]).upper()
 
     @pytest.mark.asyncio
-    async def test_server(self):
+    async def test_server_two_clients(self) -> None:
         # Initialize
         server: BlessServer = BlessServer("Test Server")
 
@@ -74,7 +73,6 @@ class TestBlessServer:
         await server.add_new_service(service_uuid)
 
         assert len(server.services) > 0
-        # print(server.services)
 
         # setup a characteristic for the service
         char_uuid: str = str(uuid.uuid4())
@@ -126,22 +124,30 @@ class TestBlessServer:
 
         assert await server.is_advertising() is True
 
-        # Subscribe
+        # Subscribe clients sequentially
         assert await server.is_connected() is False
 
         print(
-            "\nPlease connect to the computer and "
+            "\nPlease connect the first client and "
             + f"subscribe to characteristic {char_uuid}"
         )
-        await aioconsole.ainput("Press enter when ready...")
+        await aioconsole.ainput("Press enter when the first client is ready...")
 
-        assert await server.is_connected() is True
+        assert len(server.subscribed_clients) == 1
+
+        print(
+            "\nPlease connect the second client and "
+            + f"subscribe to characteristic {char_uuid}"
+        )
+        await aioconsole.ainput("Press enter when the second client is ready...")
+
+        assert len(server.subscribed_clients) == 2
 
         # Read Test
         hex_val: str = self.gen_hex_pairs()
         server.get_characteristic(char_uuid).value = self.hex_to_byte(hex_val)
         print(
-            "Trigger a read command and "
+            "Trigger a read command from either client and "
             + "enter the capital letters you retrieve below"
         )
         entered_value = await aioconsole.ainput("Value: ")
@@ -149,7 +155,7 @@ class TestBlessServer:
 
         # Write Test
         hex_val = self.gen_hex_pairs()
-        print(f"Set the characteristic to this value: {hex_val}")
+        print(f"Set the characteristic to this value from either client: {hex_val}")
         await aioconsole.ainput("Press enter when ready...")
         entered_value = self.byte_to_hex(server.get_characteristic(char_uuid).value)
         assert entered_value == hex_val
@@ -158,18 +164,18 @@ class TestBlessServer:
         hex_val = self.gen_hex_pairs()
         server.get_characteristic(char_uuid).value = self.hex_to_byte(hex_val)
 
-        print("A new value will be notified on the phone")
-        await aioconsole.ainput("Press enter to receive the new value...")
+        print("A new value will be notified on both clients")
+        await aioconsole.ainput("Press enter to send the new value...")
 
         server.update_value(service_uuid, char_uuid)
 
-        new_value: str = await aioconsole.ainput("Enter the new value: ")
+        new_value = await aioconsole.ainput("Enter the new value from either client: ")
         assert new_value == hex_val
 
         # unsubscribe
-        print("Unsubscribe from the characteristic")
-        await aioconsole.ainput("Press entery when ready...")
-        assert await server.is_connected() is False
+        print("Unsubscribe both clients from the characteristic")
+        await aioconsole.ainput("Press enter when ready...")
+        assert len(server.subscribed_clients) == 0
 
         # Stop Advertising
         await server.stop()

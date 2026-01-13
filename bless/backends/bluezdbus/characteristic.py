@@ -130,6 +130,7 @@ class BlessGATTCharacteristicBlueZDBus(
     def value(self, val: bytearray):
         """Set the value of the characteristic"""
         self._value = val
+        self.obj.Value = self._value
 
     @property
     def uuid(self) -> str:

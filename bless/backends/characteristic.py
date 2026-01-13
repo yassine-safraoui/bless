@@ -2,7 +2,7 @@ import abc
 
 from enum import Flag
 from uuid import UUID
-from typing import Union, Optional, cast, List, TYPE_CHECKING
+from typing import List, Optional, Set, Union, TYPE_CHECKING, cast
 
 from bleak.backends.characteristic import (  # type: ignore
     BleakGATTCharacteristic,
@@ -94,6 +94,7 @@ class BlessGATTCharacteristic(BleakGATTCharacteristic):
         )
         self._permissions: GATTAttributePermissions = permissions
         self._initial_value: Optional[bytearray] = value
+        self._subscribed_centrals: Set[str] = set()
 
     def __str__(self):
         """
@@ -126,3 +127,16 @@ class BlessGATTCharacteristic(BleakGATTCharacteristic):
     ) -> Optional["BlessGATTDescriptor"]:
         """Get a descriptor by handle or UUID."""
         return cast("BlessGATTDescriptor", super().get_descriptor(specifier))
+
+    @property
+    def subscribed_centrals(self) -> Set[str]:
+        """
+        Unique list of subscribed central IDs
+        """
+        return self._subscribed_centrals
+
+    def add_subscription(self, central_id: str):
+        self._subscribed_centrals.add(central_id)
+
+    def remove_subscription(self, central_id: str):
+        self._subscribed_centrals.discard(central_id)

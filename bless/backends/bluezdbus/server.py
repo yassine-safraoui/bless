@@ -60,20 +60,24 @@ class BlessServerBlueZDBus(BaseBlessServer):
         """
         Asyncronous side of init
         """
-        self.bus: MessageBus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+        self.bus: MessageBus = await MessageBus(
+            bus_type=BusType.SYSTEM, negotiate_unix_fd=True
+        ).connect()
 
         self.app: BlueZGattApplication = BlueZGattApplication(
-            self.name, "org.bluez", self.bus
+            self.name,
+            "org.bluez",
+            self.bus,
+            self.read,
+            self.write,
+            self.subscribe,
+            self.unsubscribe,
         )
-
-        self.app.Read = self.read
-        self.app.Write = self.write
-        self.app.StartNotify = self.subscribe
-        self.app.StopNotify = self.unsubscribe
 
         potential_adapter: Optional[ProxyObject] = await get_adapter(
             self.bus, self._adapter
         )
+
         if potential_adapter is None:
             raise Exception("Could not locate bluetooth adapter")
         self.adapter: ProxyObject = cast(ProxyObject, potential_adapter)
@@ -291,10 +295,10 @@ class BlessServerBlueZDBus(BaseBlessServer):
             BlessGATTCharacteristicBlueZDBus,
             bless_service.get_characteristic(char_uuid),
         )
-        cur_value: Any = bless_char.value
 
         characteristic: BlueZGattCharacteristic = bless_char.gatt
-        characteristic.Value = bytes(cur_value)  # type: ignore
+        # characteristic.Value = bytes(cur_value)  # type: ignore
+        characteristic.update_value()
         return True
 
     def read(self, char: BlueZGattCharacteristic, options: Dict[str, Any]) -> bytes:
@@ -347,6 +351,7 @@ class BlessServerBlueZDBus(BaseBlessServer):
         char : BlueZGattCharacteristic
             The characteristic object involved in the request
         """
+        options["central_id"] = options.get("device")
         return self.subscribe_request(char.UUID, options)
 
     def unsubscribe(self, char: BlueZGattCharacteristic, options: Dict[str, Any]):
@@ -361,4 +366,5 @@ class BlessServerBlueZDBus(BaseBlessServer):
         char : BlueZGattCharacteristic
             The characteristic object involved in the request
         """
+        options["central_id"] = options.get("device")
         return self.unsubscribe_request(char.UUID, options)
