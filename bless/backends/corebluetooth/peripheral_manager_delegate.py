@@ -355,6 +355,8 @@ else:
                     central_uuid, char_uuid
                 )
             )
+
+            # Get the MTU
             mtu_value = None
             max_update = getattr(central, "maximumUpdateValueLength", None)
             if callable(max_update):
@@ -363,19 +365,7 @@ else:
                 mtu_value = max_update
             if mtu_value is not None and self.server is not None:
                 self.server._mtu = int(mtu_value)
-            if central_uuid in self._central_subscriptions:
-                subscriptions = self._central_subscriptions[central_uuid]
-                if char_uuid not in subscriptions:
-                    self._central_subscriptions[central_uuid].append(char_uuid)
-                else:
-                    LOGGER.debug(
-                        (
-                            "Central Device {} is already "
-                            + "subscribed to characteristic {}"
-                        ).format(central_uuid, char_uuid)
-                    )
-            else:
-                self._central_subscriptions[central_uuid] = [char_uuid]
+
             options = {"central_id": central_uuid}
             self.get_callback("subscribe")(char_uuid, options)
 
@@ -392,9 +382,6 @@ else:
                     central_uuid, char_uuid
                 )
             )
-            self._central_subscriptions[central_uuid].remove(char_uuid)
-            if len(self._central_subscriptions[central_uuid]) < 1:
-                del self._central_subscriptions[central_uuid]
 
             options = {"central_id": central_uuid}
             self.get_callback("unsubscribe")(char_uuid, options)

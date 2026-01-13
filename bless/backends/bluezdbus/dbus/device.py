@@ -1,6 +1,6 @@
 from bleak.backends.bluezdbus.defs import DEVICE_INTERFACE
-from dbus_next.constants import PropertyAccess
-from dbus_next.service import ServiceInterface, method, dbus_property
+from dbus_next.constants import PropertyAccess  # type: ignore
+from dbus_next.service import ServiceInterface, method, dbus_property  # type: ignore
 
 
 class Device1(ServiceInterface):

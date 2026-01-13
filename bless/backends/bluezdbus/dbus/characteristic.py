@@ -4,7 +4,7 @@ import os
 
 import bleak.backends.bluezdbus.defs as defs  # type: ignore
 
-from dbus_next import DBusError
+from dbus_next import DBusError  # type: ignore
 from dbus_next.constants import PropertyAccess  # type: ignore
 from dbus_next.service import ServiceInterface, method, dbus_property  # type: ignore
 from dbus_next.signature import Variant  # type: ignore
@@ -204,9 +204,9 @@ class BlueZGattCharacteristic(ServiceInterface):
         """
         if self.NotifyAcquired:
             logger.info(
-                "StartNotify called. " +
-                "AcquireNotify already called. " +
-                "Ignoring call to Start Notify"
+                "StartNotify called. "
+                + "AcquireNotify already called. "
+                + "Ignoring call to Start Notify"
             )
             return
 

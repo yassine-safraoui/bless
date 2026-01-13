@@ -63,23 +63,8 @@ class TestBlessServerMultiClient:
     def byte_to_hex(self, b: bytearray) -> str:
         return "".join([hex(x)[2:] for x in b]).upper()
 
-    def subscribed_client_count(self, server: BlessServer) -> Optional[int]:
-        if hasattr(server, "_subscribed_clients"):
-            return len(getattr(server, "_subscribed_clients"))
-        if hasattr(server, "peripheral_manager_delegate"):
-            delegate = getattr(server, "peripheral_manager_delegate")
-            subscriptions = getattr(delegate, "_central_subscriptions", None)
-            if isinstance(subscriptions, dict):
-                return len(subscriptions)
-        app = getattr(server, "app", None)
-        if app is not None:
-            subscribed = getattr(app, "subscribed_characteristics", None)
-            if isinstance(subscribed, list):
-                return len(subscribed)
-        return None
-
     @pytest.mark.asyncio
-    async def test_server_two_clients(self):
+    async def test_server_two_clients(self) -> None:
         # Initialize
         server: BlessServer = BlessServer("Test Server")
 
@@ -148,10 +133,7 @@ class TestBlessServerMultiClient:
         )
         await aioconsole.ainput("Press enter when the first client is ready...")
 
-        count = self.subscribed_client_count(server)
-        if count is None:
-            pytest.skip("Backend does not expose per-client subscription counts")
-        assert count == 1
+        assert len(server.subscribed_clients) == 1
 
         print(
             "\nPlease connect the second client and "
@@ -159,7 +141,7 @@ class TestBlessServerMultiClient:
         )
         await aioconsole.ainput("Press enter when the second client is ready...")
 
-        assert self.subscribed_client_count(server) == 2
+        assert len(server.subscribed_clients) == 2
 
         # Read Test
         hex_val: str = self.gen_hex_pairs()
@@ -193,7 +175,7 @@ class TestBlessServerMultiClient:
         # unsubscribe
         print("Unsubscribe both clients from the characteristic")
         await aioconsole.ainput("Press enter when ready...")
-        assert self.subscribed_client_count(server) == 0
+        assert len(server.subscribed_clients) == 0
 
         # Stop Advertising
         await server.stop()

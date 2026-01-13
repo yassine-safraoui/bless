@@ -6,8 +6,8 @@ import os
 import bleak.backends.bluezdbus.defs as defs  # type: ignore
 
 from asyncio import AbstractEventLoop, Event
-from dbus_next.aio import ProxyInterface, ProxyObject, MessageBus
-from dbus_next.introspection import Interface, Node
+from dbus_next.aio import ProxyInterface, ProxyObject, MessageBus  # type: ignore
+from dbus_next.introspection import Interface, Node  # type: ignore
 from select import poll, POLLHUP, POLLERR, POLLNVAL
 from socket import socket, socketpair, AF_UNIX, SOCK_SEQPACKET
 from typing import Callable, Coroutine, Optional, Union
@@ -17,8 +17,7 @@ from .device import Device1
 logger = logging.getLogger(name=__name__)
 
 DisconnectCallback = Union[
-    Callable[["NotifySession"], None],
-    Callable[["NotifySession"], Coroutine]
+    Callable[["NotifySession"], None], Callable[["NotifySession"], Coroutine]
 ]
 
 
@@ -43,9 +42,7 @@ class NotifySession:
 
     def get_device(self) -> ProxyInterface:
         if self._device is None:
-            raise Exception(
-                "NotifySession not started. Device properties not obtained"
-            )
+            raise Exception("NotifySession not started. Device properties not obtained")
 
         return self._device
 
@@ -54,9 +51,7 @@ class NotifySession:
 
     async def watch_fd(self) -> None:
         if self._tx is None:
-            raise Exception(
-                "NotifySession not started. Transmission socket not open"
-            )
+            raise Exception("NotifySession not started. Transmission socket not open")
         fd: int = self._tx.fileno()
         p: poll = poll()
         p.register(fd, POLLHUP | POLLERR | POLLNVAL)
