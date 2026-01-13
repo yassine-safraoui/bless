@@ -1,5 +1,5 @@
 from uuid import UUID
-from typing import Union, Dict
+from typing import Optional, Union, Dict
 
 from CoreBluetooth import CBMutableService, CBUUID  # type: ignore
 
@@ -16,7 +16,7 @@ class BlessGATTServiceCoreBluetooth(BaseBlessGATTService, BleakGATTService):
     GATT Characteristic implementation for the CoreBluetooth backend
     """
 
-    def __init__(self, uuid: Union[str, UUID]):
+    def __init__(self, uuid: Union[str, UUID], primary: Optional[bool] = None):
         """
         New Bless Service for macOS
 
@@ -24,8 +24,11 @@ class BlessGATTServiceCoreBluetooth(BaseBlessGATTService, BleakGATTService):
         ----------
         uuid: Union[str, UUID]
             The uuid to assign to the service
+        primary : Optional[bool]
+            True if this is a primary service, False otherwise. If None, default
+            behavior of the backend is used which is that all services are primary.
         """
-        BaseBlessGATTService.__init__(self, uuid)
+        BaseBlessGATTService.__init__(self, uuid, primary)
         self.__handle = 0
         self._characteristics: Dict[int, BlessGATTCharacteristic] = {}  # type: ignore
         self._cb_service = None
@@ -36,7 +39,7 @@ class BlessGATTServiceCoreBluetooth(BaseBlessGATTService, BleakGATTService):
         """
         service_uuid: CBUUID = CBUUID.alloc().initWithString_(self._uuid)
         cb_service: CBMutableService = CBMutableService.alloc().initWithType_primary_(
-            service_uuid, True
+            service_uuid, True if self._primary is None else self._primary
         )
 
         # Store the CoreBluetooth service

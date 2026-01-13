@@ -1,7 +1,7 @@
 import abc
 
 from uuid import UUID
-from typing import List, Union, cast, TYPE_CHECKING
+from typing import Optional, List, Union, cast, TYPE_CHECKING
 from bleak.backends.service import BleakGATTService  # type: ignore
 
 if TYPE_CHECKING:
@@ -14,7 +14,7 @@ class BlessGATTService(BleakGATTService):
     GATT Service object for Bless
     """
 
-    def __init__(self, uuid: Union[str, UUID]):
+    def __init__(self, uuid: Union[str, UUID], primary: Optional[bool] = None):
         """
         Instantiates a new GATT Service but is not yet assigned to any
         application
@@ -23,11 +23,15 @@ class BlessGATTService(BleakGATTService):
         ----------
         uuid : Union[str, UUID]
             The uuid of the service
+        primary : Optional[bool]
+            True if this is a primary service, False otherwise. If None, default
+            behavior of the backend is used.
         """
         if type(uuid) is str:
             uuid_str: str = cast(str, uuid)
             uuid = UUID(uuid_str)
         self._uuid: str = str(uuid)
+        self._primary = primary
         self._characteristics: dict[int, BlessGATTCharacteristic] = {}  # type: ignore
 
     @abc.abstractmethod

@@ -105,7 +105,7 @@ class BaseBlessServer(abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    async def add_new_service(self, uuid: str):
+    async def add_new_service(self, uuid: str, primary: Optional[bool] = None):
         """
         Add a new GATT service to be hosted by the server
 
@@ -113,6 +113,9 @@ class BaseBlessServer(abc.ABC):
         ----------
         uuid : str
             The UUID for the service to add
+        primary : Optional[bool]
+            True if this is a primary service, False otherwise. If None,
+            default behavior of the backend is used.
         """
         raise NotImplementedError()
 

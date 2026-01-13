@@ -156,7 +156,7 @@ class BlessServerBlueZDBus(BaseBlessServer):
         await self.setup_task
         return await self.app.is_advertising(self.adapter)
 
-    async def add_new_service(self, uuid: str):
+    async def add_new_service(self, uuid: str, primary: Optional[bool] = None):
         """
         Add a new GATT service to be hosted by the server
 
@@ -164,9 +164,13 @@ class BlessServerBlueZDBus(BaseBlessServer):
         ----------
         uuid : str
             The UUID for the service to add
+        primary : Optional[bool]
+            True if this is a primary service, False otherwise. If None,
+            default behavior of the backend is used which is only the first
+            service added is primary.
         """
         await self.setup_task
-        service: BlessGATTServiceBlueZDBus = BlessGATTServiceBlueZDBus(uuid)
+        service: BlessGATTServiceBlueZDBus = BlessGATTServiceBlueZDBus(uuid, primary)
         await service.init(self)
         self.services[service.uuid] = service
 

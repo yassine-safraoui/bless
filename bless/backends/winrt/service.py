@@ -32,7 +32,7 @@ class BlessGATTServiceWinRT(BaseBlessGATTService, BleakGATTService):
     GATT Characteristic implementation for the WinRT backend
     """
 
-    def __init__(self, uuid: Union[str, UUID]):
+    def __init__(self, uuid: Union[str, UUID], primary: Optional[bool] = None):
         """
         Initialize the Bless GATT Service object
 
@@ -40,8 +40,13 @@ class BlessGATTServiceWinRT(BaseBlessGATTService, BleakGATTService):
         ----------
         uuid: Union[str, UUID]
             The UUID to assign to the service
+        primary : Optional[bool]
+            True if this is a primary service, False otherwise. If None, default
+            behavior of the backend is used.
+            For WinRT, it seems to only allow primary services to be added so this
+            is currently unused.
         """
-        BaseBlessGATTService.__init__(self, uuid)
+        BaseBlessGATTService.__init__(self, uuid, primary)
         self.service_provider: Optional[GattServiceProvider] = None
         self._local_service: Optional[GattLocalService] = None
         self._characteristics: Dict[int, BlessGATTCharacteristic] = {}  # type: ignore

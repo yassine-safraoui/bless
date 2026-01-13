@@ -1,5 +1,5 @@
 from uuid import UUID
-from typing import Mapping, Union, cast, TYPE_CHECKING
+from typing import Mapping, Optional, Union, cast, TYPE_CHECKING
 
 from bleak.backends.service import BleakGATTService  # type: ignore
 from bless.backends.bluezdbus.dbus.service import BlueZGattService
@@ -17,7 +17,7 @@ class BlessGATTServiceBlueZDBus(BaseBlessGATTService, BleakGATTService):
     GATT service implementation for the BlueZ backend
     """
 
-    def __init__(self, uuid: Union[str, UUID]):
+    def __init__(self, uuid: Union[str, UUID], primary: Optional[bool] = None):
         """
         Initialize the Bless GATT Service
 
@@ -25,8 +25,12 @@ class BlessGATTServiceBlueZDBus(BaseBlessGATTService, BleakGATTService):
         ----------
         uuid : Union[str, UUID]
             The UUID to assign to the service
+        primary : Optional[bool]
+            True if this is a primary service, False otherwise. If None,
+            default behavior of the backend is used which is only the first
+            service added is primary.
         """
-        BaseBlessGATTService.__init__(self, uuid)
+        BaseBlessGATTService.__init__(self, uuid, primary)
         self._characteristics: Mapping[int, BlessGATTCharacteristic] = (
             {}  # type: ignore[assignment]
         )
@@ -43,7 +47,9 @@ class BlessGATTServiceBlueZDBus(BaseBlessGATTService, BleakGATTService):
             The server to assign the service to
         """
         bluez_server: "BlessServerBlueZDBus" = cast("BlessServerBlueZDBus", server)
-        gatt_service: BlueZGattService = await bluez_server.app.add_service(self._uuid)
+        gatt_service: BlueZGattService = await bluez_server.app.add_service(
+            self._uuid, primary=self._primary
+        )
 
         # Store the BlueZ GATT service
         self.gatt = gatt_service
