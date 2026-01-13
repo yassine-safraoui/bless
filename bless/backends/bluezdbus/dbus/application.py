@@ -270,7 +270,16 @@ class BlueZGattApplication(ServiceInterface):
             Whether a central device is subscribed to one of our
             characteristics
         """
-        return len(self.subscribed_characteristics) > 0
+        return (
+            sum(
+                [
+                    characteristic.Notifying
+                    for service in self.services
+                    for characteristic in service.characteristics
+                ]
+            )
+            > 0
+        )
 
     async def _register_object(
         self, o: Union[BlueZGattService, BlueZGattCharacteristic, BlueZGattDescriptor]
