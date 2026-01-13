@@ -176,7 +176,7 @@ class BlueZGattCharacteristic(ServiceInterface):
         f = self._service.app.StartNotify
         if f is None:
             raise NotImplementedError()
-        f(self, {})
+        f(self, {"device": address})
         self._subscribed_centrals[address] = session
 
         async def close_rx():
@@ -194,7 +194,7 @@ class BlueZGattCharacteristic(ServiceInterface):
         f = self._service.app.StopNotify
         if f is None:
             raise NotImplementedError()
-        f(self, {})
+        f(self, {"device": address})
         del self._subscribed_centrals[address]
 
     @method()

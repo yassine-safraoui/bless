@@ -334,6 +334,7 @@ class BaseBlessServer(abc.ABC):
         Obtain the characteristic to subscribe to and pass on to the
         user-defined on_subscribe
         """
+        LOGGER.debug(f"Subscribe_request\n\tuuid: {uuid}\n\toptions: {options}")
         characteristic: Optional[BlessGATTCharacteristic] = self.get_characteristic(
             uuid
         )
