@@ -114,8 +114,8 @@ class BaseBlessServer(abc.ABC):
         uuid : str
             The UUID for the service to add
         primary : Optional[bool]
-            True if this is a primary service, False otherwise. If None, default
-            behavior of the backend is used.        
+            True if this is a primary service, False otherwise. If None,
+            default behavior of the backend is used.
         """
         raise NotImplementedError()
 

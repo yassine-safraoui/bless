@@ -26,8 +26,9 @@ class BlessGATTServiceBlueZDBus(BaseBlessGATTService, BleakGATTService):
         uuid : Union[str, UUID]
             The UUID to assign to the service
         primary : Optional[bool]
-            True if this is a primary service, False otherwise. If None, default
-            behavior of the backend is used which is only the first service added is primary.
+            True if this is a primary service, False otherwise. If None,
+            default behavior of the backend is used which is only the first
+            service added is primary.
         """
         BaseBlessGATTService.__init__(self, uuid, primary)
         self._characteristics: Mapping[int, BlessGATTCharacteristic] = (

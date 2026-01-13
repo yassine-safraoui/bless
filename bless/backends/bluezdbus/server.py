@@ -165,8 +165,9 @@ class BlessServerBlueZDBus(BaseBlessServer):
         uuid : str
             The UUID for the service to add
         primary : Optional[bool]
-            True if this is a primary service, False otherwise. If None, default
-            behavior of the backend is used which is only the first service added is primary.
+            True if this is a primary service, False otherwise. If None,
+            default behavior of the backend is used which is only the first
+            service added is primary.
         """
         await self.setup_task
         service: BlessGATTServiceBlueZDBus = BlessGATTServiceBlueZDBus(uuid, primary)

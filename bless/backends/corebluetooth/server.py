@@ -184,7 +184,9 @@ class BlessServerCoreBluetooth(BaseBlessServer):
             behavior of the backend is used which is that all services are primary.
         """
         logger.debug("Creating a new service with uuid: {}".format(uuid))
-        service: BlessGATTServiceCoreBluetooth = BlessGATTServiceCoreBluetooth(uuid, primary)
+        service: BlessGATTServiceCoreBluetooth = BlessGATTServiceCoreBluetooth(
+            uuid, primary
+        )
         await service.init(self)
         self.services[service.uuid] = service
 
