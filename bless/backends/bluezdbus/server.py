@@ -65,17 +65,19 @@ class BlessServerBlueZDBus(BaseBlessServer):
         ).connect()
 
         self.app: BlueZGattApplication = BlueZGattApplication(
-            self.name, "org.bluez", self.bus
+            self.name,
+            "org.bluez",
+            self.bus,
+            self.read,
+            self.write,
+            self.subscribe,
+            self.unsubscribe,
         )
-
-        self.app.Read = self.read
-        self.app.Write = self.write
-        self.app.StartNotify = self.subscribe
-        self.app.StopNotify = self.unsubscribe
 
         potential_adapter: Optional[ProxyObject] = await get_adapter(
             self.bus, self._adapter
         )
+
         if potential_adapter is None:
             raise Exception("Could not locate bluetooth adapter")
         self.adapter: ProxyObject = cast(ProxyObject, potential_adapter)

@@ -25,13 +25,26 @@ from bless.backends.bluezdbus.dbus.descriptor import BlueZGattDescriptor  # type
 
 LOGGER = logging.getLogger(__name__)
 
+ReadCallback = Callable[[BlueZGattCharacteristic, Dict[str, Any]], bytes]
+WriteCallback = Callable[[BlueZGattCharacteristic, bytes, Dict[str, Any]], None]
+SubscribeCallback = Callable[[BlueZGattCharacteristic, Dict[str, Any]], None]
+
 
 class BlueZGattApplication(ServiceInterface):
     """
     org.bluez.GattApplication1 interface implementation
     """
 
-    def __init__(self, name: str, destination: str, bus: MessageBus):
+    def __init__(
+        self,
+        name: str,
+        destination: str,
+        bus: MessageBus,
+        on_read: ReadCallback,
+        on_write: WriteCallback,
+        on_subscribe: SubscribeCallback,
+        on_unsubscribe: SubscribeCallback,
+    ):
         """
         Initialize a new GattApplication1
 
@@ -49,6 +62,10 @@ class BlueZGattApplication(ServiceInterface):
         self.app_name: str = name
         self.destination: str = destination
         self.bus: MessageBus = bus
+        self.Read: ReadCallback = on_read
+        self.Write: WriteCallback = on_write
+        self.StartNotify: SubscribeCallback = on_subscribe
+        self.StopNotify: SubscribeCallback = on_unsubscribe
 
         # Valid path must be ASCII characters "[A-Z][a-z][0-9]_"
         # see https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-marshaling-object-path  # noqa E501
@@ -56,21 +73,6 @@ class BlueZGattApplication(ServiceInterface):
         self.base_path: str = "/org/bluez/" + re.sub("[^A-Za-z0-9_]", "", self.app_name)
         self.advertisements: List[BlueZLEAdvertisement] = []
         self.services: List[BlueZGattService] = []
-
-        self.Read: Optional[
-            Callable[[BlueZGattCharacteristic, Dict[str, Any]], bytes]
-        ] = None
-        self.Write: Optional[
-            Callable[[BlueZGattCharacteristic, bytes, Dict[str, Any]], None]
-        ] = None
-        self.StartNotify: Optional[
-            Callable[[BlueZGattCharacteristic, Dict[str, Any]], None]
-        ] = None
-        self.StopNotify: Optional[
-            Callable[[BlueZGattCharacteristic, Dict[str, Any]], None]
-        ] = None
-
-        self.subscribed_characteristics: List[str] = []
 
         super(BlueZGattApplication, self).__init__(self.destination)
 
