@@ -39,6 +39,14 @@ class NotifySession:
 
         self._tx: Optional[socket] = None
         self._device: Optional[ProxyInterface] = None
+        self._address: Optional[str] = None
+
+    @property
+    def address(self) -> str:
+        if self._address is None:
+            raise Exception("NotifySession not started. Address property not obtained")
+
+        return self._address
 
     def get_device(self) -> ProxyInterface:
         if self._device is None:
@@ -73,6 +81,7 @@ class NotifySession:
             "org.bluez", self.device_path, node
         )
         self._device = object.get_interface(defs.DEVICE_INTERFACE)
+        self._address = await self.get_device_address()
 
         # create a bluetooth socket pair
         self._tx, rx = socketpair(AF_UNIX, SOCK_SEQPACKET)
