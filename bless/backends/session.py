@@ -19,9 +19,9 @@ class BlessGATTSession:
 
     @property
     @abstractmethod
-    def device_id(self) -> str:
+    def central_id(self) -> str:
         """
-        The device ID of this session
+        The central ID of this session
         """
         raise NotImplementedError
 

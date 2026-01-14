@@ -5,7 +5,6 @@ from .dbus.session import NotifySession
 from ..session import BlessGATTSession
 
 
-
 class BlessGATTSessionBlueZ(BlessGATTSession):
 
     @property
@@ -13,7 +12,7 @@ class BlessGATTSessionBlueZ(BlessGATTSession):
         return cast(NotifySession, self.obj)
 
     @property
-    def device_id(self) -> str:
+    def central_id(self) -> str:
         return self.session.address
 
     @property

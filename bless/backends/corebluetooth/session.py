@@ -11,7 +11,7 @@ class BlessGATTSessionCoreBluetooth(BlessGATTSession):
         return cast(CBCentral, self.obj)
 
     @property
-    def device_id(self) -> str:
+    def central_id(self) -> str:
         return self.central.identifier().UUIDString()
 
     @property

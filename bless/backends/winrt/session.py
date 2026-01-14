@@ -13,7 +13,7 @@ class BlessGATTSessionWinRT(BlessGATTSession):
         return cast(GattSubscribedClient, self.obj)
 
     @property
-    def device_id(self) -> str:
+    def central_id(self) -> str:
         return self.subscribed_client.session.device_id.id
 
     @property
