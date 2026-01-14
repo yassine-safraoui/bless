@@ -14,10 +14,15 @@ from bless.backends.characteristic import (  # type: ignore
     GATTCharacteristicProperties,
 )
 from bless.backends.descriptor import GATTDescriptorProperties  # type: ignore
+from bless.backends.session import BlessGATTSession
+from bless.backends.requests import BlessGATTRequest
 
 from bless.exceptions import BlessError
 
 LOGGER = logging.getLogger(__name__)
+GATTReadCallback = Callable[[BlessGATTCharacteristic, BlessGATTRequest], bytes]
+GATTWriteCallback = Callable[[BlessGATTCharacteristic, BlessGATTRequest, bytes], None]
+GATTSubscribeCallback = Callable[[BlessGATTCharacteristic, BlessGATTSession], None]
 
 
 class BaseBlessServer(abc.ABC):
