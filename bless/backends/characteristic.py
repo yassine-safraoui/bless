@@ -2,7 +2,7 @@ import abc
 
 from enum import Flag
 from uuid import UUID
-from typing import List, Optional, Set, Union, TYPE_CHECKING, cast
+from typing import Callable, List, Optional, Set, Union, TYPE_CHECKING, cast
 
 from bleak.backends.characteristic import (  # type: ignore
     BleakGATTCharacteristic,
@@ -10,10 +10,16 @@ from bleak.backends.characteristic import (  # type: ignore
 )
 
 from .attribute import GATTAttributePermissions
+from .request import BlessGATTRequest
+from .session import BlessGATTSession
 
 if TYPE_CHECKING:
     from bless.backends.service import BlessGATTService
     from bless.backends.descriptor import BlessGATTDescriptor
+
+UniqueGATTReadCallback = Callable[[BlessGATTRequest], bytearray]
+UniqueGATTWriteCallback = Callable[[bytes, BlessGATTRequest], None]
+UniqueGATTSubscribeCallback = Callable[[BlessGATTSession], None]
 
 
 class GATTCharacteristicProperties(Flag):
@@ -67,6 +73,10 @@ class BlessGATTCharacteristic(BleakGATTCharacteristic):
         properties: GATTCharacteristicProperties,
         permissions: GATTAttributePermissions,
         value: Optional[bytearray],
+        on_read: Optional[UniqueGATTReadCallback] = None,
+        on_write: Optional[UniqueGATTWriteCallback] = None,
+        on_subscribe: Optional[UniqueGATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[UniqueGATTSubscribeCallback] = None,
     ):
         """
         Instantiates a new GATT Characteristic but is not yet assigned to any
@@ -83,7 +93,24 @@ class BlessGATTCharacteristic(BleakGATTCharacteristic):
             Permissions that define the protection levels of the properties
         value : Optional[bytearray]
             The binary value of the characteristic
+        on_read : Optional[UniqueGATTReadCallback]
+            If defined, reads destined for this characteristic will be passed
+            to this function
+        on_write : Optional[UniqueGATTWriteCallback]
+            If defined, writes destined for this characteristic will be passed
+            to this function
+        on_subscribe : Optional[UniqueGATTSubscribeCallback]
+            If defined, subscriptions destined for this characteristic will be
+            passed to this function
+        on_unsubscribe : Optional[UniqueGATTSubscribeCallback]
+            If defined, unsubscriptions destined for this characteristic will
+            be passed to this function
         """
+        self.on_read: Optional[UniqueGATTReadCallback] = on_read
+        self.on_write: Optional[UniqueGATTWriteCallback] = on_write
+        self.on_subscribe: Optional[UniqueGATTSubscribeCallback] = on_subscribe
+        self.on_unsubscribe: Optional[UniqueGATTSubscribeCallback] = on_unsubscribe
+
         if type(uuid) is str:
             uuid_str: str = cast(str, uuid)
             uuid = UUID(uuid_str)

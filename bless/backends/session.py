@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any
+from typing import Any, Dict
 
 
 class BlessGATTSession:
@@ -16,6 +16,15 @@ class BlessGATTSession:
             The backend-specific session object
         """
         self.obj: Any = obj
+
+    def __str__(self) -> str:
+        return f"BlessGATTSession({self.to_dict()})"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "central_id": self.central_id,
+            "mtu": self.mtu,
+        }
 
     @property
     @abstractmethod

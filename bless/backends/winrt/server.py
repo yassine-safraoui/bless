@@ -22,8 +22,10 @@ from bless.backends.winrt.characteristic import (  # type: ignore
 )
 from bless.backends.winrt.descriptor import BlessGATTDescriptorWinRT  # type: ignore
 
-
 from bless.backends.winrt.ble import BLEAdapter
+
+from .request import BlessGATTRequestWinRT
+from .session import BlessGATTSessionWinRT
 
 # CLR imports
 # Import of Bleak CLR->UWP Bridge.
@@ -45,6 +47,7 @@ if sys.version_info >= (3, 12):
         GattReadRequest,
         GattWriteRequestedEventArgs,
         GattWriteRequest,
+        GattSession,
         GattSubscribedClient,
     )
 else:
@@ -65,6 +68,7 @@ else:
         GattReadRequest,
         GattWriteRequestedEventArgs,
         GattWriteRequest,
+        GattSession,
         GattSubscribedClient,
     )
 
@@ -287,9 +291,14 @@ class BlessServerWinRT(BaseBlessServer):
             char_uuid, properties, permissions, value
         )
         await characteristic.init(service)
-        characteristic.obj.add_read_requested(self.read_characteristic)
-        characteristic.obj.add_write_requested(self.write_characteristic)
-        characteristic.obj.add_subscribed_clients_changed(self.subscribe_characteristic)
+
+        # All characteristics route through to:
+        #   1. Backend-specific `__on_<verb>`
+        #   2. Bless server `_on_<verb>`
+        #   3. User-defined `on_<verb>`
+        characteristic.obj.add_read_requested(self.__on_read)
+        characteristic.obj.add_write_requested(self.__on_write)
+        characteristic.obj.add_subscribed_clients_changed(self.__on_subscribe)
         service.add_characteristic(characteristic)
 
     async def add_new_descriptor(
@@ -356,7 +365,7 @@ class BlessServerWinRT(BaseBlessServer):
 
         return True
 
-    def read_characteristic(
+    def __on_read(
         self, sender: GattLocalCharacteristic, args: GattReadRequestedEventArgs
     ):
         """
@@ -374,6 +383,11 @@ class BlessServerWinRT(BaseBlessServer):
         deferral: Optional[Deferral] = args.get_deferral()
         if deferral is None:
             return
+
+        # Get the session
+        session: GattSession = args.session
+
+        # Get the request object
         logger.debug("Getting request object {}".format(self))
         request: GattReadRequest
 
@@ -383,7 +397,12 @@ class BlessServerWinRT(BaseBlessServer):
 
         asyncio.new_event_loop().run_until_complete(f())
         logger.debug("Got request object {}".format(request))
-        value: bytearray = self.read_request(str(sender.uuid), {})
+
+        # pass up to server-side callback
+        value: bytearray = self._on_read(
+            str(sender.uuid), BlessGATTRequestWinRT((session, request))
+        )
+
         logger.debug(f"Current Characteristic value {value}")
         value = value if value is not None else b"\x00"
         writer: DataWriter = DataWriter()
@@ -391,7 +410,7 @@ class BlessServerWinRT(BaseBlessServer):
         request.respond_with_value(writer.detach_buffer())
         deferral.complete()
 
-    def write_characteristic(
+    def __on_write(
         self, sender: GattLocalCharacteristic, args: GattWriteRequestedEventArgs
     ):
         """
@@ -409,6 +428,11 @@ class BlessServerWinRT(BaseBlessServer):
         deferral: Optional[Deferral] = args.get_deferral()
         if deferral is None:
             return
+
+        # Get the session
+        session: GattSession = args.session
+
+        # Get the request
         request: GattWriteRequest
 
         async def f():
@@ -417,6 +441,8 @@ class BlessServerWinRT(BaseBlessServer):
 
         asyncio.new_event_loop().run_until_complete(f())
         logger.debug("Request value: {}".format(request.value))
+
+        # extrac the bytarray value
         reader: Optional[DataReader] = DataReader.from_buffer(request.value)
         if reader is None:
             return
@@ -425,9 +451,12 @@ class BlessServerWinRT(BaseBlessServer):
         for n in range(0, n_bytes):
             next_byte: int = reader.read_byte()
             value.append(next_byte)
-
         logger.debug("Written Value: {}".format(value))
-        self.write_request(str(sender.uuid), value, {})
+
+        # Pass up to server
+        self._on_write(
+            str(sender.uuid), value, BlessGATTRequestWinRT((session, request))
+        )
 
         if request.option == GattWriteOption.WRITE_WITH_RESPONSE:
             request.respond()
@@ -435,9 +464,13 @@ class BlessServerWinRT(BaseBlessServer):
         logger.debug("Write Complete")
         deferral.complete()
 
-    def subscribe_characteristic(self, sender: GattLocalCharacteristic, args: Any):
+    def __on_subscribe(self, sender: GattLocalCharacteristic, args: Any):
         """
-        Called when a characteristic is subscribed to
+        Called when a characteristic is subscribed to or unsubscribed from
+
+        Because there is no "unsubscribe", we track when central devices come
+        and go to determine whether to call upstream subscribe or unsubscribe
+        callbacks
 
         Parameters
         ----------
@@ -457,32 +490,28 @@ class BlessServerWinRT(BaseBlessServer):
         new_ids: Set[str] = {str(client.session.device_id.id) for client in new_clients}
 
         # Handle Callbacks
-        added = new_ids - prev_ids
-        removed = prev_ids - new_ids
-        logger.debug(f"Added: {added}")
-        logger.debug(f"removed: {removed}")
-        if added:
-            for cid in added:
-                self.subscribe_request(str(sender.uuid), {"central_id": cid})
-        elif len(new_clients) > len(self._subscribed_clients):
-            self.subscribe_request(str(sender.uuid))
+        added_ids: Set[str] = new_ids - prev_ids
+        removed_ids: Set[str] = prev_ids - new_ids
+        logger.debug(f"Added: {added_ids}")
+        logger.debug(f"removed: {removed_ids}")
 
-        if removed:
-            for cid in removed:
-                self.unsubscribe_request(str(sender.uuid), {"central_id": cid})
-        elif len(new_clients) < len(self._subscribed_clients):
-            self.unsubscribe_request(str(sender.uuid))
+        added_clients: List[GattSubscribedClient] = [
+            client
+            for client in new_clients
+            if str(client.session.device_id.id) in added_ids
+        ]
+        removed_clients: List[GattSubscribedClient] = [
+            client
+            for client in self._subscribed_clients
+            if str(client.session.device_id.id) in removed_ids
+        ]
+
+        # Handle Subscriptions
+        for client in added_clients:
+            self._on_subscribe(str(sender.uuid), BlessGATTSessionWinRT(client))
+
+        for client in removed_clients:
+            self._on_unsubscribe(str(sender.uuid), BlessGATTSessionWinRT(client))
 
         # Update Subscribed Clients
         self._subscribed_clients = new_clients
-
-        # Process MTU
-        if self._subscribed_clients:
-            mtu_values = [
-                int(client.max_pdu_size)
-                for client in self._subscribed_clients
-                if getattr(client, "max_pdu_size", None) is not None
-            ]
-            if mtu_values:
-                self._mtu = max(mtu_values)
-        logger.info("New device subscribed")

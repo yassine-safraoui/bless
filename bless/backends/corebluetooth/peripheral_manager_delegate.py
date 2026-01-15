@@ -356,18 +356,7 @@ else:
                 )
             )
 
-            # Get the MTU
-            mtu_value = None
-            max_update = getattr(central, "maximumUpdateValueLength", None)
-            if callable(max_update):
-                mtu_value = max_update()
-            else:
-                mtu_value = max_update
-            if mtu_value is not None and self.server is not None:
-                self.server._mtu = int(mtu_value)
-
-            options = {"central_id": central_uuid}
-            self.get_callback("subscribe")(char_uuid, options)
+            self.get_callback("subscribe")(char_uuid, central)
 
         def peripheralManager_central_didUnsubscribeFromCharacteristic_(  # noqa: N802 E501
             self,
@@ -383,8 +372,7 @@ else:
                 )
             )
 
-            options = {"central_id": central_uuid}
-            self.get_callback("unsubscribe")(char_uuid, options)
+            self.get_callback("unsubscribe")(char_uuid, central)
 
         def peripheralManagerIsReadyToUpdateSubscribers_(  # noqa: N802
             self, peripheral_manager: CBPeripheralManager
@@ -394,8 +382,6 @@ else:
         def peripheralManager_didReceiveReadRequest_(  # noqa: N802
             self, peripheral_manager: CBPeripheralManager, request: CBATTRequest
         ):
-            # This should probably be a callback to be handled by the user, to be
-            # implemented or given to the BleakServer
             LOGGER.debug(
                 "Received read request from {} for characteristic {}".format(
                     request.central().identifier().UUIDString(),
@@ -403,14 +389,14 @@ else:
                 )
             )
             request.setValue_(
-                self.get_callback("read")(request.characteristic().UUID().UUIDString())
+                self.get_callback("read")(request.characteristic().UUID().UUIDString()),
+                request,
             )
             peripheral_manager.respondToRequest_withResult_(request, CBATTErrorSuccess)
 
         def peripheralManager_didReceiveWriteRequests_(  # noqa: N802
             self, peripheral_manager: CBPeripheralManager, requests: List[CBATTRequest]
         ):
-            # Again, this should likely be moved to a callback
             LOGGER.debug("Receving write requests...")
             for request in requests:
                 central: CBCentral = request.central()
@@ -423,7 +409,7 @@ else:
                         value,
                     )
                 )
-                self.get_callback("write")(char.UUID().UUIDString(), value)
+                self.get_callback("write")(char.UUID().UUIDString(), value, request)
 
             peripheral_manager.respondToRequest_withResult_(
                 requests[0], CBATTErrorSuccess

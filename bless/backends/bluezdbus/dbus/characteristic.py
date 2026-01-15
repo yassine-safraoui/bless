@@ -5,6 +5,7 @@ import os
 import bleak.backends.bluezdbus.defs as defs  # type: ignore
 
 from dbus_next import DBusError  # type: ignore
+from dbus_next.aio import ProxyInterface  # type: ignore
 from dbus_next.constants import PropertyAccess  # type: ignore
 from dbus_next.service import ServiceInterface, method, dbus_property  # type: ignore
 from dbus_next.signature import Variant  # type: ignore
@@ -12,6 +13,7 @@ from enum import Enum
 from typing import List, TYPE_CHECKING, Any, Dict
 
 from .descriptor import BlueZGattDescriptor, DescriptorFlags  # type: ignore
+from .device import Device1
 from .session import NotifySession  # type: ignore
 
 if TYPE_CHECKING:
@@ -111,7 +113,7 @@ class BlueZGattCharacteristic(ServiceInterface):
         return len(self._subscribed_centrals) > 0
 
     @method()  # noqa: F722
-    def ReadValue(self, options: "a{sv}") -> "ay":  # type: ignore # noqa: F722 F821 N802 E501
+    async def ReadValue(self, options: "a{sv}") -> "ay":  # type: ignore # noqa: F722 F821 N802 E501
         """
         Read the value of the characteristic.
         This is to be fully implemented at the application level
@@ -126,6 +128,9 @@ class BlueZGattCharacteristic(ServiceInterface):
         bytes
             The bytes that is the value of the characteristic
         """
+        device_path: str = options["device"]
+        device: ProxyInterface = Device1.get_device(self._service.bus, device_path)
+        options["central_id"] = await device.get_address()
         f = self._service.app.Read
         if f is None:
             raise NotImplementedError()
@@ -144,6 +149,9 @@ class BlueZGattCharacteristic(ServiceInterface):
         options : Dict
             Some options for you to select from
         """
+        device_path: str = options["device"]
+        device: ProxyInterface = Device1.get_device(self._service.bus, device_path)
+        options["central_id"] = device.get_address()
         f = self._service.app.Write
         if f is None:
             raise NotImplementedError()
@@ -176,14 +184,14 @@ class BlueZGattCharacteristic(ServiceInterface):
         f = self._service.app.StartNotify
         if f is None:
             raise NotImplementedError()
-        f(self, {"device": address})
+
+        f(self, session)
         self._subscribed_centrals[address] = session
 
         async def close_rx():
             logger.debug("Closing RX")
             await asyncio.sleep(2)
             os.close(rx)
-            # asyncio.get_running_loop().call_soon_threadsafe(os.close, rx)
 
         asyncio.create_task(close_rx())
         return [rx, mtu]
@@ -194,7 +202,7 @@ class BlueZGattCharacteristic(ServiceInterface):
         f = self._service.app.StopNotify
         if f is None:
             raise NotImplementedError()
-        f(self, {"device": address})
+        f(self, session)
         del self._subscribed_centrals[address]
 
     @method()

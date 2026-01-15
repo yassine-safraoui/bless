@@ -3,11 +3,8 @@ import inspect
 import logging
 import os
 
-import bleak.backends.bluezdbus.defs as defs  # type: ignore
-
 from asyncio import AbstractEventLoop, Event
-from dbus_next.aio import ProxyInterface, ProxyObject, MessageBus  # type: ignore
-from dbus_next.introspection import Interface, Node  # type: ignore
+from dbus_next.aio import ProxyInterface, MessageBus  # type: ignore
 from select import poll, POLLHUP, POLLERR, POLLNVAL
 from socket import socket, socketpair, AF_UNIX, SOCK_SEQPACKET
 from typing import Callable, Coroutine, Optional, Union
@@ -71,16 +68,7 @@ class NotifySession:
                     self.close()
 
     async def start(self) -> int:
-
-        # Query the device object
-        node: Node = Node.default(name=self.device_path)
-        device_iface: Interface = Device1().introspect()
-        node.interfaces.append(device_iface)
-
-        object: ProxyObject = self.bus.get_proxy_object(
-            "org.bluez", self.device_path, node
-        )
-        self._device = object.get_interface(defs.DEVICE_INTERFACE)
+        self._device = Device1.get_device(self.bus, self.device_path)
         self._address = await self.get_device_address()
 
         # create a bluetooth socket pair

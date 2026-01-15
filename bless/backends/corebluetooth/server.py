@@ -7,12 +7,14 @@ from asyncio import TimeoutError
 from asyncio.events import AbstractEventLoop
 
 from CoreBluetooth import (  # type: ignore
-    CBService,
-    CBPeripheralManager,
-    CBMutableCharacteristic,
-    CBMutableDescriptor,
     CBAdvertisementDataLocalNameKey,
     CBAdvertisementDataServiceUUIDsKey,
+    CBATTRequest,
+    CBCentral,
+    CBMutableCharacteristic,
+    CBMutableDescriptor,
+    CBPeripheralManager,
+    CBService,
     CBUUID,
 )
 
@@ -39,6 +41,8 @@ from bless.backends.attribute import (
 from bless.backends.characteristic import (
     GATTCharacteristicProperties,
 )
+from .request import BlessGATTRequestCoreBluetooth
+from .session import BlessGATTSessionCoreBluetooth
 
 
 logger = logging.getLogger(name=__name__)
@@ -71,9 +75,9 @@ class BlessServerCoreBluetooth(BaseBlessServer):
         ) = PeripheralManagerDelegate.alloc().init(
             self,
             {
-                "read": self.read_request,
-                "write": self.write_request,
-                "subscribe": self.subscribe_request,
+                "read": self.__on_read,
+                "write": self.__on_write,
+                "subscribe": self.__on_subscribe,
                 "unsubscribe": self.unsubscribe_request,
             },
         )
@@ -298,3 +302,15 @@ class BlessServerCoreBluetooth(BaseBlessServer):
         )
 
         return result
+
+    def __on_read(self, uuid: str, request: CBATTRequest) -> bytearray:
+        return self._on_read(uuid, BlessGATTRequestCoreBluetooth(request))
+
+    def __on_write(self, uuid: str, value: bytearray, request: CBATTRequest) -> None:
+        return self._on_write(uuid, value, BlessGATTRequestCoreBluetooth(request))
+
+    def __on_subscribe(self, uuid: str, central: CBCentral) -> None:
+        return self._on_subscribe(uuid, BlessGATTSessionCoreBluetooth(central))
+
+    def __on_unsubscribe(self, uuid: str, central: CBCentral) -> None:
+        return self._on_unsubscribe(uuid, BlessGATTSessionCoreBluetooth(central))

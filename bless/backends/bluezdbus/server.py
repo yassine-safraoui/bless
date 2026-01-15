@@ -16,10 +16,11 @@ from bless.backends.bluezdbus.descriptor import BlessGATTDescriptorBlueZDBus
 from bless.backends.bluezdbus.dbus.application import (  # type: ignore
     BlueZGattApplication,
 )
-from bless.backends.bluezdbus.dbus.utils import get_adapter  # type: ignore
 from bless.backends.bluezdbus.dbus.characteristic import (  # type: ignore
     BlueZGattCharacteristic,
 )
+from bless.backends.bluezdbus.dbus.session import NotifySession
+from bless.backends.bluezdbus.dbus.utils import get_adapter  # type: ignore
 
 from bless.backends.bluezdbus.service import BlessGATTServiceBlueZDBus
 
@@ -36,6 +37,9 @@ from bless.backends.descriptor import (  # type: ignore
 )
 
 from bleak.uuids import normalize_uuid_str
+
+from .request import BlessGATTRequestBlueZ
+from .session import BlessGATTSessionBlueZ
 
 
 class BlessServerBlueZDBus(BaseBlessServer):
@@ -68,10 +72,10 @@ class BlessServerBlueZDBus(BaseBlessServer):
             self.name,
             "org.bluez",
             self.bus,
-            self.read,
-            self.write,
-            self.subscribe,
-            self.unsubscribe,
+            self.__on_read,
+            self.__on_write,
+            self.__on_subscribe,
+            self.__on_unsubscribe,
         )
 
         potential_adapter: Optional[ProxyObject] = await get_adapter(
@@ -302,7 +306,9 @@ class BlessServerBlueZDBus(BaseBlessServer):
         characteristic.update_value()
         return True
 
-    def read(self, char: BlueZGattCharacteristic, options: Dict[str, Any]) -> bytes:
+    def __on_read(
+        self, char: BlueZGattCharacteristic, options: Dict[str, Any]
+    ) -> bytes:
         """
         Read request.
         This re-routes the the request incomming on the dbus to the server to
@@ -320,11 +326,11 @@ class BlessServerBlueZDBus(BaseBlessServer):
         bytes
             The value of the characteristic
         """
-        return bytes(self.read_request(char.UUID, options))
+        return bytes(self._on_read(char.UUID, BlessGATTRequestBlueZ(options)))
 
-    def write(
+    def __on_write(
         self, char: BlueZGattCharacteristic, value: bytes, options: Dict[str, Any]
-    ):
+    ) -> None:
         """
         Write request.
         This function re-routes the write request sent from the
@@ -338,9 +344,13 @@ class BlessServerBlueZDBus(BaseBlessServer):
         value : bytearray
             The value being requested to set
         """
-        return self.write_request(char.UUID, bytearray(value), options)
+        return self.write_request(
+            char.UUID, bytearray(value), BlessGATTRequestBlueZ(options)
+        )
 
-    def subscribe(self, char: BlueZGattCharacteristic, options: Dict[str, Any]):
+    def __on_subscribe(
+        self, char: BlueZGattCharacteristic, session: NotifySession
+    ) -> None:
         """
         Subscribe request.
         This function re-routes the subscribe request sent from the
@@ -352,10 +362,11 @@ class BlessServerBlueZDBus(BaseBlessServer):
         char : BlueZGattCharacteristic
             The characteristic object involved in the request
         """
-        options["central_id"] = options.get("device")
-        return self.subscribe_request(char.UUID, options)
+        return self.subscribe_request(char.UUID, BlessGATTSessionBlueZ(session))
 
-    def unsubscribe(self, char: BlueZGattCharacteristic, options: Dict[str, Any]):
+    def __on_unsubscribe(
+        self, char: BlueZGattCharacteristic, session: NotifySession
+    ) -> None:
         """
         Unsubscribe request.
         This function re-routes the unsubscribe request sent from the
@@ -367,5 +378,4 @@ class BlessServerBlueZDBus(BaseBlessServer):
         char : BlueZGattCharacteristic
             The characteristic object involved in the request
         """
-        options["central_id"] = options.get("device")
-        return self.unsubscribe_request(char.UUID, options)
+        return self.unsubscribe_request(char.UUID, BlessGATTSessionBlueZ(session))

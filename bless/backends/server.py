@@ -15,14 +15,15 @@ from bless.backends.characteristic import (  # type: ignore
 )
 from bless.backends.descriptor import GATTDescriptorProperties  # type: ignore
 from bless.backends.session import BlessGATTSession
-from bless.backends.requests import BlessGATTRequest
+from bless.backends.request import BlessGATTRequest
 
 from bless.exceptions import BlessError
 
-LOGGER = logging.getLogger(__name__)
-GATTReadCallback = Callable[[BlessGATTCharacteristic, BlessGATTRequest], bytes]
-GATTWriteCallback = Callable[[BlessGATTCharacteristic, BlessGATTRequest, bytes], None]
+GATTReadCallback = Callable[[BlessGATTCharacteristic, BlessGATTRequest], bytearray]
+GATTWriteCallback = Callable[[BlessGATTCharacteristic, bytes, BlessGATTRequest], None]
 GATTSubscribeCallback = Callable[[BlessGATTCharacteristic, BlessGATTSession], None]
+
+LOGGER = logging.getLogger(__name__)
 
 
 class BaseBlessServer(abc.ABC):
@@ -35,8 +36,20 @@ class BaseBlessServer(abc.ABC):
         Used to manage services and characteristics that this server advertises
     """
 
-    def __init__(self, loop: Optional[AbstractEventLoop] = None, **kwargs):
+    def __init__(
+        self,
+        loop: Optional[AbstractEventLoop] = None,
+        on_read: Optional[GATTReadCallback] = None,
+        on_write: Optional[GATTWriteCallback] = None,
+        on_subscribe: Optional[GATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[GATTSubscribeCallback] = None,
+        **kwargs,
+    ):
         self.loop: AbstractEventLoop = loop if loop else asyncio.get_event_loop()
+        self.on_read: Optional[GATTReadCallback] = on_read
+        self.on_write: Optional[GATTWriteCallback] = on_write
+        self.on_subscribe: Optional[GATTSubscribeCallback] = on_subscribe
+        self.on_unsubscribe: Optional[GATTSubscribeCallback] = on_unsubscribe
 
         self._callbacks: Dict[str, Callable[[Any], Any]] = {}
 
@@ -291,7 +304,7 @@ class BaseBlessServer(abc.ABC):
                             desc_info.get("Permissions"),
                         )
 
-    def read_request(self, uuid: str, options: Optional[Dict] = None) -> bytearray:
+    def _on_read(self, uuid: str, request: BlessGATTRequest) -> bytearray:
         """
         This function should be handed off to the subsequent backend bluetooth
         servers as a callback for incoming read requests on values for
@@ -303,6 +316,8 @@ class BaseBlessServer(abc.ABC):
         uuid : str
             The string representation of the UUID for the characteristic whose
             value is to be read
+        request : BlessGATTRequest
+            The read request
 
         Returns
         -------
@@ -310,39 +325,75 @@ class BaseBlessServer(abc.ABC):
             A bytearray value that represents the value for the characteristic
             requested
         """
-        if options is not None:
-            self._update_mtu_from_options(options)
+        LOGGER.debug(f"Read request\n\tuuid: {uuid}\n\trequest: {request}")
         characteristic: Optional[BlessGATTCharacteristic] = self.get_characteristic(
             uuid
         )
-
         if not characteristic:
             raise BlessError("Invalid characteristic: {}".format(uuid))
 
-        return self.on_read(characteristic)
+        # handle MTU capture
+        self.mtu = request.mtu
 
-    def write_request(
-        self, uuid: str, value: Any, options: Optional[Dict] = None
-    ) -> None:
+        # Route to characteristic read
+        if characteristic.on_read is not None:
+            return characteristic.on_read(request)
+
+        # Route to server defined read
+        if self.on_read is not None:
+            return self.on_read(characteristic, request)
+
+        # Generic handling
+        return characteristic.value
+
+    def _on_write(self, uuid: str, value: Any, request: BlessGATTRequest) -> None:
         """
         Obtain the characteristic to write and pass on to the user-defined
         on_write
 
+        Parameters
+        ----------
+        uuid : str
+            The string representation of the UUID for the characteristic whose
+            value is to be written
+        value : Any
+            The value to write to the characteristic
+        request : BlessGATTRequest
+            The write request data
+
         """
-        if options is not None:
-            self._update_mtu_from_options(options)
+        LOGGER.debug(f"Write request\n\tuuid: {uuid}\n\trequest: {request}")
         characteristic: Optional[BlessGATTCharacteristic] = self.get_characteristic(
             uuid
         )
+        if not characteristic:
+            raise BlessError("Invalid characteristic: {}".format(uuid))
 
-        self.on_write(characteristic, value)
+        # handle MTU capture
+        self.mtu = request.mtu
 
-    def subscribe_request(self, uuid: str, options: Optional[Dict] = None) -> None:
+        # Route to characteristic write
+        if characteristic.on_write is not None:
+            return characteristic.on_write(value, request)
+
+        # Route to server defined write
+        if self.on_write is not None:
+            return self.on_write(characteristic, value, request)
+
+    def _on_subscribe(self, uuid: str, session: BlessGATTSession) -> None:
         """
         Obtain the characteristic to subscribe to and pass on to the
         user-defined on_subscribe
+
+        Parameters
+        ----------
+        uuid : str
+            The string representation of the UUID for the characteristic whose
+            value is to be subscribed to
+        session : BlessGATTSession
+            The session object
         """
-        LOGGER.debug(f"Subscribe_request\n\tuuid: {uuid}\n\toptions: {options}")
+        LOGGER.debug(f"Subscribe request\n\tuuid: {uuid}\n\tsession: {session}")
         characteristic: Optional[BlessGATTCharacteristic] = self.get_characteristic(
             uuid
         )
@@ -350,19 +401,31 @@ class BaseBlessServer(abc.ABC):
         if characteristic is None:
             raise BlessError(f"Invalid characteristic: {uuid}")
 
-        if options is not None:
-            self._update_mtu_from_options(options)
+        # handle MTU capture
+        self.mtu = session.mtu
 
-            if options.get("central_id") is not None:
-                characteristic.add_subscription(options["central_id"])
+        # Route to characteristic subscription
+        if characteristic.on_subscribe is not None:
+            return characteristic.on_subscribe(session)
 
-        self.on_subscribe(characteristic)
+        # Route to server defined subscription
+        if self.on_subscribe is not None:
+            return self.on_subscribe(characteristic, session)
 
-    def unsubscribe_request(self, uuid: str, options: Optional[Dict] = None) -> None:
+    def _on_unsubscribe(self, uuid: str, session: BlessGATTSession) -> None:
         """
         Obtain the characteristic to unsubscribe from and pass on to the
         user-defined on_unsubscribe
+
+        Parameters
+        ----------
+        uuid : str
+            The string representation of the UUID for the characteristic whose
+            value is to be unsubscribed from
+        session : BlessGATTSession
+            The session object
         """
+        LOGGER.debug(f"Unsubscribe request\n\tuuid: {uuid}\n\tsession: {session}")
         characteristic: Optional[BlessGATTCharacteristic] = self.get_characteristic(
             uuid
         )
@@ -370,84 +433,44 @@ class BaseBlessServer(abc.ABC):
         if characteristic is None:
             raise BlessError(f"Invalid characteristic: {uuid}")
 
-        if options is not None:
-            self._update_mtu_from_options(options)
+        # handle MTU capture
+        self.mtu = session.mtu
 
-            if options.get("central_id") is not None:
-                characteristic.remove_subscription(options["central_id"])
+        # Route to characteristic unsubscription
+        if characteristic.on_unsubscribe is not None:
+            return characteristic.on_unsubscribe(session)
 
-        self.on_unsubscribe(characteristic)
+        # Route to server defined unsubscription
+        if self.on_unsubscribe is not None:
+            return self.on_unsubscribe(characteristic, session)
 
-    @property
-    def on_read(self) -> Callable[[Any], Any]:
+    # Aliases for backwards compatibility
+    def read_request(self, uuid: str, request: BlessGATTRequest) -> bytearray:
         """
-        Alias for `read_request_func`.
+        Alias for `_on_read` for backwards compatibility
         """
-        func: Optional[Callable[[Any], Any]] = self._callbacks.get("read")
-        if func is not None:
-            return func
-        else:
-            raise BlessError("Server: Read Callback is undefined")
+        return self._on_read(uuid, request)
 
-    @on_read.setter
-    def on_read(self, func: Callable):
+    def write_request(self, uuid: str, value: Any, request: BlessGATTRequest) -> None:
         """
-        Alias for `read_request_func`.
+        Alias for `_on_write` for backwards compatibility
         """
-        self._callbacks["read"] = func
+        return self._on_write(uuid, value, request)
 
-    @property
-    def on_write(self) -> Callable:
+    def subscribe_request(self, uuid: str, session: BlessGATTSession) -> None:
         """
-        Alias for `write_request_func`.
+        Alias for `_on_subscribe` for backwards compatibility
         """
-        func: Optional[Callable[[Any], Any]] = self._callbacks.get("write")
-        if func is not None:
-            return func
-        else:
-            raise BlessError("Server: Write Callback is undefined")
+        return self._on_subscribe(uuid, session)
 
-    @on_write.setter
-    def on_write(self, func: Callable):
+    def unsubscribe_request(self, uuid: str, session: BlessGATTSession) -> None:
         """
-        Alias for `write_request_func`.
+        Alias for `_on_unsubscribe` for backwards compatibility
         """
-        self._callbacks["write"] = func
+        return self._on_unsubscribe(uuid, session)
 
     @property
-    def on_subscribe(self) -> Callable:
-        """
-        Alias for `subscribe_request_func`.
-        """
-        func: Optional[Callable[[Any], Any]] = self._callbacks.get("subscribe")
-        if func is not None:
-            return func
-        else:
-            raise BlessError("Server: Subscribe Callback is undefined")
-
-    @on_subscribe.setter
-    def on_subscribe(self, func: Callable):
-        """ """
-        self._callbacks["subscribe"] = func
-
-    @property
-    def on_unsubscribe(self) -> Callable:
-        """
-        Alias for `unsubscribe_request_func`.
-        """
-        func: Optional[Callable[[Any], Any]] = self._callbacks.get("unsubscribe")
-        if func is not None:
-            return func
-        else:
-            raise BlessError("Server: Unsubscribe Callback is undefined")
-
-    @on_unsubscribe.setter
-    def on_unsubscribe(self, func: Callable):
-        """ """
-        self._callbacks["unsubscribe"] = func
-
-    @property
-    def read_request_func(self) -> Callable[[Any], Any]:
+    def read_request_func(self) -> Optional[GATTReadCallback]:
         """
         Return an instance of the function to handle incoming read requests
 
@@ -458,7 +481,7 @@ class BaseBlessServer(abc.ABC):
         return self.on_read
 
     @read_request_func.setter
-    def read_request_func(self, func: Callable):
+    def read_request_func(self, func: GATTReadCallback):
         """
         Set the function to handle incoming read requests
 
@@ -469,7 +492,7 @@ class BaseBlessServer(abc.ABC):
         self.on_read = func
 
     @property
-    def write_request_func(self) -> Callable:
+    def write_request_func(self) -> Optional[GATTWriteCallback]:
         """
         Return an instance of the function to handle incoming write requests
 
@@ -480,7 +503,7 @@ class BaseBlessServer(abc.ABC):
         return self.on_write
 
     @write_request_func.setter
-    def write_request_func(self, func: Callable):
+    def write_request_func(self, func: GATTWriteCallback):
         """
         Set the function to handle incoming write requests
 
@@ -504,22 +527,6 @@ class BaseBlessServer(abc.ABC):
         """
         self._mtu = value
 
-    @staticmethod
-    def _coerce_mtu_value(value: Any) -> Optional[int]:
-        if value is None:
-            return None
-        if hasattr(value, "value"):
-            return BaseBlessServer._coerce_mtu_value(value.value)
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return None
-
-    def _update_mtu_from_options(self, options: Dict[str, Any]) -> None:
-        mtu_value = self._coerce_mtu_value(options.get("mtu"))
-        if mtu_value is not None:
-            self._mtu = mtu_value
-
     @property
     def subscribed_centrals(self) -> Set[str]:
         """
@@ -540,12 +547,6 @@ class BaseBlessServer(abc.ABC):
         Alias for `subscribed_centrals`.
         """
         return self.subscribed_centrals
-
-    def _normalize_uuid(self, uuid: str) -> str:
-        try:
-            return str(UUID(uuid))
-        except ValueError:
-            return uuid
 
     @staticmethod
     def is_uuid(uuid: str) -> bool:

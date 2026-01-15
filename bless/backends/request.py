@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 
 class BlessGATTRequest:
@@ -12,6 +12,17 @@ class BlessGATTRequest:
             The backend-specific request object
         """
         self.obj: Any = obj
+
+    def __str__(self) -> str:
+        return f"BlessGATTRequest({self.to_dict()})"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "central_id": self.central_id,
+            "mtu": self.mtu,
+            "offset": self.offset,
+            "response_requested": self.response_requested,
+        }
 
     @property
     @abstractmethod
