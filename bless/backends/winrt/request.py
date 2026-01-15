@@ -1,8 +1,19 @@
-from winrt.windows.devices.bluetooth.genericattributeprofile import (  # type: ignore # noqa: E501
-    GattSession,
-    GattReadRequest,
-    GattWriteRequest,
-)
+import sys
+
+if sys.version_info >= (3, 12):
+    from winrt.windows.devices.bluetooth.genericattributeprofile import (  # type: ignore # noqa: E501
+        GattSession,
+        GattReadRequest,
+        GattWriteRequest,
+        GattWriteOption
+    )
+else:
+    from bleak_winrt.windows.devices.bluetooth.genericattributeprofile import (  # type: ignore # noqa: E501
+        GattSession,
+        GattReadRequest,
+        GattWriteRequest,
+        GattWriteOption
+    )
 from typing import Optional, Tuple, Union, cast
 from ..request import BlessGATTRequest
 
@@ -41,5 +52,5 @@ class BlessGATTRequestWinRT(BlessGATTRequest):
         return (
             None
             if isinstance(self.request, GattReadRequest)
-            else (self.request.options != 0x1)
+            else (self.request.option == GattWriteOption.WRITE_WITH_RESPONSE)
         )
