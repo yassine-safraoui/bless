@@ -161,8 +161,19 @@ class BlessServerCoreBluetooth(BaseBlessServer):
         bool
             True if there are central devices that are connected
         """
-        n_subscriptions = len(self.peripheral_manager_delegate._central_subscriptions)
-        return n_subscriptions > 0
+        return (
+            len(
+                set(
+                    [
+                        cid
+                        for service in self.services.values()
+                        for characteristic in service.characteristics
+                        for cid in characteristic.subscribed_centrals
+                    ]
+                )
+            )
+            > 0
+        )
 
     async def is_advertising(self) -> bool:
         """

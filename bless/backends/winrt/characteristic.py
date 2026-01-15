@@ -1,6 +1,6 @@
 import sys
 from uuid import UUID
-from typing import Union, Optional, Dict
+from typing import Dict, Optional, Union, Set
 
 from bleak.backends.characteristic import (  # type: ignore
     BleakGATTCharacteristic,
@@ -176,3 +176,9 @@ class BlessGATTCharacteristicWinRT(
     def value(self, val: bytearray):
         """Set the value of the characteristic"""
         self._value = val
+
+    @property
+    def subscribed_centrals(self) -> Set[str]:
+        return set(
+            [client.session.device_id.id for client in self.obj.subscribed_clients]
+        )

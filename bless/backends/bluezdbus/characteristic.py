@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from typing import Union, Optional, List, Dict, cast, TYPE_CHECKING, Literal
+from typing import Dict, List, Literal, Optional, Set, TYPE_CHECKING, Union, cast
 
 from bleak.backends.characteristic import (  # type: ignore
     BleakGATTCharacteristic,
@@ -42,6 +42,7 @@ class BlessGATTCharacteristicBlueZDBus(
     """
     BlueZ implementation of the BlessGATTCharacteristic
     """
+
     gatt: "BlueZGattCharacteristic"
 
     def __init__(
@@ -141,6 +142,10 @@ class BlessGATTCharacteristicBlueZDBus(
     def description(self) -> str:
         """Description of this characteristic"""
         return f"Characteristic {self._uuid}"
+
+    @property
+    def subscribed_centrals(self) -> Set[str]:
+        set(list(self.obj._subscribed_centrals.keys()))
 
 
 def transform_flags_with_permissions(

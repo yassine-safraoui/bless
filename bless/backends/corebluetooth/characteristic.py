@@ -1,6 +1,6 @@
 from enum import Flag
 from uuid import UUID
-from typing import Union, Optional, Dict
+from typing import Dict, Optional, Set, Union
 
 from CoreBluetooth import CBUUID, CBMutableCharacteristic  # type: ignore
 
@@ -120,3 +120,12 @@ class BlessGATTCharacteristicCoreBluetooth(
         if self._cb_characteristic is not None:
             cb_char: CBMutableCharacteristic = self._cb_characteristic
             cb_char.setValue_(val)
+
+    @property
+    def subscribed_centrals(self) -> Set[str]:
+        return set(
+            [
+                central.identifier().UUIDString()
+                for central in self.obj.subscribedCentrals()
+            ]
+        )
