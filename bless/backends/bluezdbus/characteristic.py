@@ -145,7 +145,7 @@ class BlessGATTCharacteristicBlueZDBus(
 
     @property
     def subscribed_centrals(self) -> Set[str]:
-        set(list(self.obj._subscribed_centrals.keys()))
+        return set(list(self.obj._subscribed_centrals.keys()))
 
 
 def transform_flags_with_permissions(
