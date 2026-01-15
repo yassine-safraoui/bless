@@ -389,8 +389,9 @@ else:
                 )
             )
             request.setValue_(
-                self.get_callback("read")(request.characteristic().UUID().UUIDString()),
-                request,
+                self.get_callback("read")(
+                    request.characteristic().UUID().UUIDString(), request
+                )
             )
             peripheral_manager.respondToRequest_withResult_(request, CBATTErrorSuccess)
 

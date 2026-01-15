@@ -78,7 +78,7 @@ class BlessServerCoreBluetooth(BaseBlessServer):
                 "read": self.__on_read,
                 "write": self.__on_write,
                 "subscribe": self.__on_subscribe,
-                "unsubscribe": self.unsubscribe_request,
+                "unsubscribe": self.__on_unsubscribe,
             },
         )
 

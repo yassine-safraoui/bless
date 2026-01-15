@@ -16,4 +16,4 @@ class BlessGATTSessionCoreBluetooth(BlessGATTSession):
 
     @property
     def mtu(self) -> int:
-        return self.central.maximumUpdateValueLength
+        return self.central.maximumUpdateValueLength()

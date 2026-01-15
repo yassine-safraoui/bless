@@ -16,7 +16,7 @@ class BlessGATTRequestCoreBluetooth(BlessGATTRequest):
 
     @property
     def mtu(self) -> int:
-        return self.request.maximumUpdateValueLength()
+        return self.request.central().maximumUpdateValueLength()
 
     @property
     def offset(self) -> int:
@@ -26,5 +26,5 @@ class BlessGATTRequestCoreBluetooth(BlessGATTRequest):
     def response_requested(self) -> Optional[bool]:
         return not (
             self.request.characteristic().properties()
-            & GATTCharacteristicProperties.write_without_response
+            & GATTCharacteristicProperties.write_without_response.value
         )
