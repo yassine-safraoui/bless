@@ -181,18 +181,6 @@ class BlessServerWinRT(BaseBlessServer):
             service_provider.stop_advertising()
         self._advertising = False
 
-    async def is_connected(self) -> bool:
-        """
-        Determine whether there are any connected peripheral devices
-
-        Returns
-        -------
-        bool
-            True if there are any central devices that have subscribed to our
-            characteristics
-        """
-        return len(self._subscribed_clients) > 0
-
     async def is_advertising(self) -> bool:
         """
         Determine whether the server is advertising

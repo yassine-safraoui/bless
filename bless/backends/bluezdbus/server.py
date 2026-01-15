@@ -137,17 +137,6 @@ class BlessServerBlueZDBus(BaseBlessServer):
 
         return True
 
-    async def is_connected(self) -> bool:
-        """
-        Determine whether there are any connected peripheral devices
-
-        Returns
-        -------
-        bool
-            Whether any peripheral devices are connected
-        """
-        return await self.app.is_connected()
-
     async def is_advertising(self) -> bool:
         """
         Determine whether the server is advertising

@@ -98,7 +98,6 @@ class BaseBlessServer(abc.ABC):
         """
         raise NotImplementedError()
 
-    @abc.abstractmethod
     async def is_connected(self) -> bool:
         """
         Determine whether there are any connected central devices
@@ -108,7 +107,19 @@ class BaseBlessServer(abc.ABC):
         bool
             Whether any peripheral devices are connected
         """
-        raise NotImplementedError()
+        return (
+            len(
+                set(
+                    [
+                        cid
+                        for service in self.services.values()
+                        for characteristic in service.characteristics
+                        for cid in characteristic.subscribed_centrals
+                    ]
+                )
+            )
+            > 0
+        )
 
     @abc.abstractmethod
     async def is_advertising(self) -> bool:
