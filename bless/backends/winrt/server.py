@@ -120,7 +120,7 @@ class BlessServerWinRT(BaseBlessServer):
         self.name: str = name
 
         self._service_provider: Optional[GattServiceProvider] = None
-        self._subscribed_clients: List[GattSubscribedClient] = []
+        self._subscribed_clients: Dict[str, Set[GAttSubscribedClient]] = {}
 
         self._advertising: bool = False
         self._advertising_started: Event = Event()
@@ -472,17 +472,22 @@ class BlessServerWinRT(BaseBlessServer):
             list([]) if sender.subscribed_clients is None else sender.subscribed_clients
         )
 
-        prev_ids: Set[str] = {
-            str(client.session.device_id.id) for client in self._subscribed_clients
-        }
+        prev_ids: Set[str] = set(
+            [
+                str(client.session.device_id.id)
+                for client in self._subscribed_clients.get(str(sender.uuid), set())
+            ]
+        )
+
         new_ids: Set[str] = {str(client.session.device_id.id) for client in new_clients}
 
-        # Handle Callbacks
+        # compute added and removed
         added_ids: Set[str] = new_ids - prev_ids
         removed_ids: Set[str] = prev_ids - new_ids
         logger.debug(f"Added: {added_ids}")
         logger.debug(f"removed: {removed_ids}")
 
+        # convert to client objects
         added_clients: List[GattSubscribedClient] = [
             client
             for client in new_clients
@@ -490,7 +495,7 @@ class BlessServerWinRT(BaseBlessServer):
         ]
         removed_clients: List[GattSubscribedClient] = [
             client
-            for client in self._subscribed_clients
+            for client in self._subscribed_clients[str(sender.uuid)]
             if str(client.session.device_id.id) in removed_ids
         ]
 
@@ -502,4 +507,4 @@ class BlessServerWinRT(BaseBlessServer):
             self._on_unsubscribe(str(sender.uuid), BlessGATTSessionWinRT(client))
 
         # Update Subscribed Clients
-        self._subscribed_clients = new_clients
+        self._subscribed_clients[str(sender.uuid)] = new_clients
