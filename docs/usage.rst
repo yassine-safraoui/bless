@@ -35,3 +35,15 @@ Create a server, add a GATT tree, then start advertising:
 
    loop = asyncio.get_event_loop()
    loop.run_until_complete(run(loop))
+
+Callback Priority
+=================
+
+Bless routes callbacks in the following order:
+
+1. Characteristic-specific callbacks (for example, `characteristic.on_read`)
+2. Server-wide callbacks (for example, `server.on_read`)
+3. Default handling if no callbacks are defined
+
+Default handling currently returns the characteristic value for reads. Writes,
+subscriptions, and unsubscriptions are no-ops unless a callback is defined.
