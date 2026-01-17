@@ -40,6 +40,9 @@ from bless.backends.attribute import (
 )
 from bless.backends.characteristic import (
     GATTCharacteristicProperties,
+    GATTReadCallback,
+    GATTWriteCallback,
+    GATTSubscribeCallback,
 )
 from .request import BlessGATTRequestCoreBluetooth
 from .session import BlessGATTSessionCoreBluetooth
@@ -189,6 +192,10 @@ class BlessServerCoreBluetooth(BaseBlessServer):
         properties: GATTCharacteristicProperties,
         value: Optional[bytearray],
         permissions: GATTAttributePermissions,
+        on_read: Optional[GATTReadCallback] = None,
+        on_write: Optional[GATTWriteCallback] = None,
+        on_subscribe: Optional[GATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[GATTSubscribeCallback] = None,
     ):
         """
         Generate a new characteristic to be associated with the server
@@ -207,12 +214,31 @@ class BlessServerCoreBluetooth(BaseBlessServer):
             The initial value for the characteristic
         permissions : GATTAttributePermissions
             The permissions for the characteristic
+        on_read : Optional[GATTReadCallback]
+            If defined, reads destined for this characteristic will be passed
+            to this function
+        on_write : Optional[GATTWriteCallback]
+            If defined, writes destined for this characteristic will be passed
+            to this function
+        on_subscribe : Optional[GATTSubscribeCallback]
+            If defined, subscriptions destined for this characteristic will be
+            passed to this function
+        on_unsubscribe : Optional[GATTSubscribeCallback]
+            If defined, unsubscriptions destined for this characteristic will
+            be passed to this function
         """
         service_uuid = str(UUID(service_uuid))
         logger.debug("Creating a new characteristic with uuid: {}".format(char_uuid))
         characteristic: BlessGATTCharacteristicCoreBluetooth = (
             BlessGATTCharacteristicCoreBluetooth(
-                char_uuid, properties, permissions, value
+                char_uuid,
+                properties,
+                permissions,
+                value,
+                on_read,
+                on_write,
+                on_subscribe,
+                on_unsubscribe,
             )
         )
 

@@ -30,6 +30,9 @@ from bless.backends.attribute import (  # type: ignore
 
 from bless.backends.characteristic import (  # type: ignore
     GATTCharacteristicProperties,
+    GATTReadCallback,
+    GATTWriteCallback,
+    GATTSubscribeCallback,
 )
 
 from bless.backends.descriptor import (  # type: ignore
@@ -174,6 +177,10 @@ class BlessServerBlueZDBus(BaseBlessServer):
         properties: GATTCharacteristicProperties,
         value: Optional[bytearray],
         permissions: GATTAttributePermissions,
+        on_read: Optional[GATTReadCallback] = None,
+        on_write: Optional[GATTWriteCallback] = None,
+        on_subscribe: Optional[GATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[GATTSubscribeCallback] = None,
     ):
         """
         Add a new characteristic to be associated with the server
@@ -193,13 +200,34 @@ class BlessServerBlueZDBus(BaseBlessServer):
         permissions : int
             GATT Characteristic flags that define the permissions for the
             characteristic
+        on_read : Optional[GATTReadCallback]
+            If defined, reads destined for this characteristic will be passed
+            to this function
+        on_write : Optional[GATTWriteCallback]
+            If defined, writes destined for this characteristic will be passed
+            to this function
+        on_subscribe : Optional[GATTSubscribeCallback]
+            If defined, subscriptions destined for this characteristic will be
+            passed to this function
+        on_unsubscribe : Optional[GATTSubscribeCallback]
+            If defined, unsubscriptions destined for this characteristic will
+            be passed to this function
         """
         await self.setup_task
         service: BlessGATTServiceBlueZDBus = cast(
             BlessGATTServiceBlueZDBus, self.services[str(UUID(service_uuid))]
         )
         characteristic: BlessGATTCharacteristicBlueZDBus = (
-            BlessGATTCharacteristicBlueZDBus(char_uuid, properties, permissions, value)
+            BlessGATTCharacteristicBlueZDBus(
+                char_uuid,
+                properties,
+                permissions,
+                value,
+                on_read,
+                on_write,
+                on_subscribe,
+                on_unsubscribe,
+            )
         )
         await characteristic.init(service)
 

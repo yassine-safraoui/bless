@@ -1,10 +1,11 @@
 import abc
 import asyncio
 import logging
+import coloredlogs
 
 from uuid import UUID
 from asyncio import AbstractEventLoop
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 from bless.backends.service import BlessGATTService
 from bless.backends.advertisement import BlessAdvertisementData
@@ -12,6 +13,9 @@ from bless.backends.attribute import GATTAttributePermissions  # type: ignore
 from bless.backends.characteristic import (  # type: ignore
     BlessGATTCharacteristic,
     GATTCharacteristicProperties,
+    GATTReadCallback,
+    GATTWriteCallback,
+    GATTSubscribeCallback,
 )
 from bless.backends.descriptor import GATTDescriptorProperties  # type: ignore
 from bless.backends.session import BlessGATTSession
@@ -19,10 +23,7 @@ from bless.backends.request import BlessGATTRequest
 
 from bless.exceptions import BlessError
 
-GATTReadCallback = Callable[[BlessGATTCharacteristic, BlessGATTRequest], bytearray]
-GATTWriteCallback = Callable[[BlessGATTCharacteristic, bytes, BlessGATTRequest], None]
-GATTSubscribeCallback = Callable[[BlessGATTCharacteristic, BlessGATTSession], None]
-
+coloredlogs.install(level="DEBUG")
 LOGGER = logging.getLogger(__name__)
 
 
@@ -50,8 +51,6 @@ class BaseBlessServer(abc.ABC):
         self.on_write: Optional[GATTWriteCallback] = on_write
         self.on_subscribe: Optional[GATTSubscribeCallback] = on_subscribe
         self.on_unsubscribe: Optional[GATTSubscribeCallback] = on_unsubscribe
-
-        self._callbacks: Dict[str, Callable[[Any], Any]] = {}
 
         self.services: Dict[str, BlessGATTService] = {}
         self._mtu: Optional[int] = None
@@ -156,6 +155,10 @@ class BaseBlessServer(abc.ABC):
         properties: GATTCharacteristicProperties,
         value: Optional[bytearray],
         permissions: GATTAttributePermissions,
+        on_read: Optional[GATTReadCallback] = None,
+        on_write: Optional[GATTWriteCallback] = None,
+        on_subscribe: Optional[GATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[GATTSubscribeCallback] = None,
     ):
         """
         Add a new characteristic to be associated with the server
@@ -174,6 +177,18 @@ class BaseBlessServer(abc.ABC):
             characteristic. Can be None if the characteristic is writable
         permissions : GATTAttributePermissions
             GATT flags that define the permissions for the characteristic
+        on_read : Optional[GATTReadCallback]
+            If defined, reads destined for this characteristic will be passed
+            to this function
+        on_write : Optional[GATTWriteCallback]
+            If defined, writes destined for this characteristic will be passed
+            to this function
+        on_subscribe : Optional[GATTSubscribeCallback]
+            If defined, subscriptions destined for this characteristic will be
+            passed to this function
+        on_unsubscribe : Optional[GATTSubscribeCallback]
+            If defined, unsubscriptions destined for this characteristic will
+            be passed to this function
         """
         raise NotImplementedError()
 
@@ -302,6 +317,10 @@ class BaseBlessServer(abc.ABC):
                     char_info.get("Properties"),
                     char_info.get("Value"),
                     char_info.get("Permissions"),
+                    char_info.get("OnRead"),
+                    char_info.get("OnWrite"),
+                    char_info.get("OnSubscribe"),
+                    char_info.get("OnUnsubscribe"),
                 )
                 descriptors = char_info.get("Descriptors")
                 if isinstance(descriptors, dict):
@@ -347,8 +366,10 @@ class BaseBlessServer(abc.ABC):
         self.mtu = request.mtu
 
         # Route to characteristic read
+        LOGGER.debug(f"on_read: {characteristic.on_read}")
         if characteristic.on_read is not None:
-            return characteristic.on_read(request)
+            LOGGER.debug("Characteristic Read!")
+            return characteristic.on_read(characteristic, request)
 
         # Route to server defined read
         if self.on_read is not None:
@@ -385,7 +406,7 @@ class BaseBlessServer(abc.ABC):
 
         # Route to characteristic write
         if characteristic.on_write is not None:
-            return characteristic.on_write(value, request)
+            return characteristic.on_write(characteristic, value, request)
 
         # Route to server defined write
         if self.on_write is not None:
@@ -417,7 +438,7 @@ class BaseBlessServer(abc.ABC):
 
         # Route to characteristic subscription
         if characteristic.on_subscribe is not None:
-            return characteristic.on_subscribe(session)
+            return characteristic.on_subscribe(characteristic, session)
 
         # Route to server defined subscription
         if self.on_subscribe is not None:
@@ -449,7 +470,7 @@ class BaseBlessServer(abc.ABC):
 
         # Route to characteristic unsubscription
         if characteristic.on_unsubscribe is not None:
-            return characteristic.on_unsubscribe(session)
+            return characteristic.on_unsubscribe(characteristic, session)
 
         # Route to server defined unsubscription
         if self.on_unsubscribe is not None:

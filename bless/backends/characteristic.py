@@ -1,4 +1,5 @@
 import abc
+import logging
 
 from enum import Flag
 from uuid import UUID
@@ -17,9 +18,11 @@ if TYPE_CHECKING:
     from bless.backends.service import BlessGATTService
     from bless.backends.descriptor import BlessGATTDescriptor
 
-UniqueGATTReadCallback = Callable[[BlessGATTRequest], bytearray]
-UniqueGATTWriteCallback = Callable[[bytes, BlessGATTRequest], None]
-UniqueGATTSubscribeCallback = Callable[[BlessGATTSession], None]
+logger = logging.getLogger(__name__)
+
+GATTReadCallback = Callable[["BlessGATTCharacteristic", BlessGATTRequest], bytearray]
+GATTWriteCallback = Callable[["BlessGATTCharacteristic", bytes, BlessGATTRequest], None]
+GATTSubscribeCallback = Callable[["BlessGATTCharacteristic", BlessGATTSession], None]
 
 
 class GATTCharacteristicProperties(Flag):
@@ -73,10 +76,10 @@ class BlessGATTCharacteristic(BleakGATTCharacteristic):
         properties: GATTCharacteristicProperties,
         permissions: GATTAttributePermissions,
         value: Optional[bytearray],
-        on_read: Optional[UniqueGATTReadCallback] = None,
-        on_write: Optional[UniqueGATTWriteCallback] = None,
-        on_subscribe: Optional[UniqueGATTSubscribeCallback] = None,
-        on_unsubscribe: Optional[UniqueGATTSubscribeCallback] = None,
+        on_read: Optional[GATTReadCallback] = None,
+        on_write: Optional[GATTWriteCallback] = None,
+        on_subscribe: Optional[GATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[GATTSubscribeCallback] = None,
     ):
         """
         Instantiates a new GATT Characteristic but is not yet assigned to any
@@ -93,24 +96,25 @@ class BlessGATTCharacteristic(BleakGATTCharacteristic):
             Permissions that define the protection levels of the properties
         value : Optional[bytearray]
             The binary value of the characteristic
-        on_read : Optional[UniqueGATTReadCallback]
+        on_read : Optional[GATTReadCallback]
             If defined, reads destined for this characteristic will be passed
             to this function
-        on_write : Optional[UniqueGATTWriteCallback]
+        on_write : Optional[GATTWriteCallback]
             If defined, writes destined for this characteristic will be passed
             to this function
-        on_subscribe : Optional[UniqueGATTSubscribeCallback]
+        on_subscribe : Optional[GATTSubscribeCallback]
             If defined, subscriptions destined for this characteristic will be
             passed to this function
-        on_unsubscribe : Optional[UniqueGATTSubscribeCallback]
+        on_unsubscribe : Optional[GATTSubscribeCallback]
             If defined, unsubscriptions destined for this characteristic will
             be passed to this function
         """
-        self.on_read: Optional[UniqueGATTReadCallback] = on_read
-        self.on_write: Optional[UniqueGATTWriteCallback] = on_write
-        self.on_subscribe: Optional[UniqueGATTSubscribeCallback] = on_subscribe
-        self.on_unsubscribe: Optional[UniqueGATTSubscribeCallback] = on_unsubscribe
+        self.on_read: Optional[GATTReadCallback] = on_read
+        self.on_write: Optional[GATTWriteCallback] = on_write
+        self.on_subscribe: Optional[GATTSubscribeCallback] = on_subscribe
+        self.on_unsubscribe: Optional[GATTSubscribeCallback] = on_unsubscribe
 
+        logger.debug(f"With on_read: {on_read}")
         if type(uuid) is str:
             uuid_str: str = cast(str, uuid)
             uuid = UUID(uuid_str)

@@ -5,7 +5,7 @@ import sys
 from uuid import UUID
 from threading import Event
 from asyncio.events import AbstractEventLoop
-from typing import Optional, List, Any, cast, Set
+from typing import Any, Dict, List, Optional, Set, cast
 
 from bless.backends.server import BaseBlessServer  # type: ignore
 from bless.backends.advertisement import BlessAdvertisementData
@@ -14,6 +14,9 @@ from bless.backends.attribute import (  # type: ignore
 )
 from bless.backends.characteristic import (  # type: ignore
     GATTCharacteristicProperties,
+    GATTReadCallback,
+    GATTWriteCallback,
+    GATTSubscribeCallback,
 )
 from bless.backends.descriptor import GATTDescriptorProperties
 from bless.backends.winrt.service import BlessGATTServiceWinRT
@@ -120,7 +123,7 @@ class BlessServerWinRT(BaseBlessServer):
         self.name: str = name
 
         self._service_provider: Optional[GattServiceProvider] = None
-        self._subscribed_clients: Dict[str, Set[GAttSubscribedClient]] = {}
+        self._subscribed_clients: Dict[str, Set[GattSubscribedClient]] = {}
 
         self._advertising: bool = False
         self._advertising_started: Event = Event()
@@ -251,6 +254,10 @@ class BlessServerWinRT(BaseBlessServer):
         properties: GATTCharacteristicProperties,
         value: Optional[bytearray],
         permissions: GATTAttributePermissions,
+        on_read: Optional[GATTReadCallback] = None,
+        on_write: Optional[GATTWriteCallback] = None,
+        on_subscribe: Optional[GATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[GATTSubscribeCallback] = None,
     ):
         """
         Generate a new characteristic to be associated with the server
@@ -268,6 +275,18 @@ class BlessServerWinRT(BaseBlessServer):
             The initial value for the characteristic
         permissions : GATTAttributePermissions
             The permissions for the characteristic
+        on_read : Optional[GATTReadCallback]
+            If defined, reads destined for this characteristic will be passed
+            to this function
+        on_write : Optional[GATTWriteCallback]
+            If defined, writes destined for this characteristic will be passed
+            to this function
+        on_subscribe : Optional[GATTSubscribeCallback]
+            If defined, subscriptions destined for this characteristic will be
+            passed to this function
+        on_unsubscribe : Optional[GATTSubscribeCallback]
+            If defined, unsubscriptions destined for this characteristic will
+            be passed to this function
         """
 
         service_uuid = str(UUID(service_uuid))
@@ -276,7 +295,14 @@ class BlessServerWinRT(BaseBlessServer):
             BlessGATTServiceWinRT, self.services[service_uuid]
         )
         characteristic: BlessGATTCharacteristicWinRT = BlessGATTCharacteristicWinRT(
-            char_uuid, properties, permissions, value
+            char_uuid,
+            properties,
+            permissions,
+            value,
+            on_read,
+            on_write,
+            on_subscribe,
+            on_unsubscribe,
         )
         await characteristic.init(service)
 
@@ -507,4 +533,4 @@ class BlessServerWinRT(BaseBlessServer):
             self._on_unsubscribe(str(sender.uuid), BlessGATTSessionWinRT(client))
 
         # Update Subscribed Clients
-        self._subscribed_clients[str(sender.uuid)] = new_clients
+        self._subscribed_clients[str(sender.uuid)] = set(new_clients)
