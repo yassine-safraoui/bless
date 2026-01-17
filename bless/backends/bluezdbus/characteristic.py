@@ -4,9 +4,6 @@ from typing import Dict, List, Literal, Optional, Set, TYPE_CHECKING, Union, cas
 
 from bleak.backends.characteristic import (  # type: ignore
     BleakGATTCharacteristic,
-    GATTReadCallback,
-    GATTWriteCallback,
-    GATTSubscribeCallback,
 )
 from bleak.backends.descriptor import BleakGATTDescriptor  # type: ignore
 
@@ -14,6 +11,9 @@ from bless.backends.attribute import GATTAttributePermissions
 from bless.backends.characteristic import (
     BlessGATTCharacteristic,
     GATTCharacteristicProperties,
+    GATTReadCallback,
+    GATTWriteCallback,
+    GATTSubscribeCallback,
 )
 from bless.backends.bluezdbus.dbus.characteristic import (
     Flags,
