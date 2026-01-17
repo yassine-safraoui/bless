@@ -1,7 +1,7 @@
 import abc
 import asyncio
 import logging
-import coloredlogs  # type: ignore[import-untyped]
+import coloredlogs  # type: ignore
 
 from uuid import UUID
 from asyncio import AbstractEventLoop

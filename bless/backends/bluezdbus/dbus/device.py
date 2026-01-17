@@ -157,3 +157,7 @@ class Device1(ServiceInterface):
 
         object: ProxyObject = bus.get_proxy_object("org.bluez", path, node)
         return object.get_interface(DEVICE_INTERFACE)
+
+    # For typing
+    async def get_address(self) -> str:
+        raise NotImplementedError

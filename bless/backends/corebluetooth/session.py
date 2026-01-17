@@ -1,4 +1,4 @@
-from CoreBluetooth import CBCentral  # type: ignore[import-untyped]
+from CoreBluetooth import CBCentral  # type: ignore
 from typing import cast
 
 from ..session import BlessGATTSession

@@ -10,7 +10,7 @@ from dbus_next.constants import PropertyAccess  # type: ignore
 from dbus_next.service import ServiceInterface, method, dbus_property  # type: ignore
 from dbus_next.signature import Variant  # type: ignore
 from enum import Enum
-from typing import List, TYPE_CHECKING, Any, Dict
+from typing import List, TYPE_CHECKING, Any, Dict, cast
 
 from .descriptor import BlueZGattDescriptor, DescriptorFlags  # type: ignore
 from .device import Device1
@@ -129,7 +129,10 @@ class BlueZGattCharacteristic(ServiceInterface):
             The bytes that is the value of the characteristic
         """
         device_path: str = options["device"]
-        device: ProxyInterface = Device1.get_device(self._service.bus, device_path)
+        device_interface: ProxyInterface = Device1.get_device(
+            self._service.bus, device_path
+        )
+        device: Device1 = cast(Device1, device_interface)
         options["central_id"] = await device.get_address()
         f = self._service.app.Read
         if f is None:
@@ -150,7 +153,10 @@ class BlueZGattCharacteristic(ServiceInterface):
             Some options for you to select from
         """
         device_path: str = options["device"]
-        device: ProxyInterface = Device1.get_device(self._service.bus, device_path)
+        device_interface: ProxyInterface = Device1.get_device(
+            self._service.bus, device_path
+        )
+        device: Device1 = cast(Device1, device_interface)
         options["central_id"] = device.get_address()
         f = self._service.app.Write
         if f is None:
@@ -222,7 +228,7 @@ class BlueZGattCharacteristic(ServiceInterface):
         f = self._service.app.StartNotify
         if f is None:
             raise NotImplementedError()
-        f(self, {})
+        f(self, None)  # type: ignore
         self._notifying_calls += 1
 
     @method()
@@ -237,7 +243,7 @@ class BlueZGattCharacteristic(ServiceInterface):
         f = self._service.app.StopNotify
         if f is None:
             raise NotImplementedError()
-        f(self, {})
+        f(self, {})  # type: ignore
         self._notifying_calls -= 1
 
     def update_value(self) -> None:
