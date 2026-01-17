@@ -15,3 +15,9 @@ Apple's CoreBluetooth APIs.
 
 .. automodule:: bless.backends.corebluetooth.descriptor
    :members:
+
+.. automodule:: bless.backends.corebluetooth.request
+   :members:
+
+.. automodule:: bless.backends.corebluetooth.session
+   :members:

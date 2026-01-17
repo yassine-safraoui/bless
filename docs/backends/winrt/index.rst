@@ -15,3 +15,9 @@ Runtime Bluetooth APIs.
 
 .. automodule:: bless.backends.winrt.descriptor
    :members:
+
+.. automodule:: bless.backends.winrt.request
+   :members:
+
+.. automodule:: bless.backends.winrt.session
+   :members:

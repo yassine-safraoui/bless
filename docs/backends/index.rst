@@ -12,6 +12,8 @@ top-level `bless` package selects the backend based on the current platform.
    attribute
    characteristic
    descriptor
+   request
+   session
    service
    server
    bluezdbus/index

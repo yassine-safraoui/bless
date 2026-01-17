@@ -1,6 +1,6 @@
 import sys
 from uuid import UUID
-from typing import Union, Optional, Dict
+from typing import Dict, Optional, Union, Set
 
 from bleak.backends.characteristic import (  # type: ignore
     BleakGATTCharacteristic,
@@ -33,6 +33,9 @@ from bless.backends.attribute import (
 from bless.backends.characteristic import (
     BlessGATTCharacteristic as BaseBlessGATTCharacteristic,
     GATTCharacteristicProperties,
+    GATTReadCallback,
+    GATTWriteCallback,
+    GATTSubscribeCallback,
 )
 
 
@@ -49,6 +52,10 @@ class BlessGATTCharacteristicWinRT(
         properties: GATTCharacteristicProperties,
         permissions: GATTAttributePermissions,
         value: Optional[bytearray],
+        on_read: Optional[GATTReadCallback] = None,
+        on_write: Optional[GATTWriteCallback] = None,
+        on_subscribe: Optional[GATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[GATTSubscribeCallback] = None,
     ):
         """
         Instantiates a new GATT Characteristic but is not yet assigned to any
@@ -65,9 +72,31 @@ class BlessGATTCharacteristicWinRT(
             Permissions that define the protection levels of the properties
         value : Optional[bytearray]
             The binary value of the characteristic
+        on_read : Optional[GATTReadCallback]
+            If defined, reads destined for this characteristic will be passed
+            to this function
+        on_write : Optional[GATTWriteCallback]
+            If defined, writes destined for this characteristic will be passed
+            to this function
+        on_subscribe : Optional[GATTSubscribeCallback]
+            If defined, subscriptions destined for this characteristic will be
+            passed to this function
+        on_unsubscribe : Optional[GATTSubscribeCallback]
+            If defined, unsubscriptions destined for this characteristic will
+            be passed to this function
         """
         value = value if value is not None else bytearray(b"")
-        BaseBlessGATTCharacteristic.__init__(self, uuid, properties, permissions, value)
+        BaseBlessGATTCharacteristic.__init__(
+            self,
+            uuid,
+            properties,
+            permissions,
+            value,
+            on_read,
+            on_write,
+            on_subscribe,
+            on_unsubscribe,
+        )
         self._value = value
         self._descriptors: Dict[int, BleakGATTDescriptor] = {}
         self._gatt_characteristic: Optional[GattLocalCharacteristic] = None
@@ -176,3 +205,9 @@ class BlessGATTCharacteristicWinRT(
     def value(self, val: bytearray):
         """Set the value of the characteristic"""
         self._value = val
+
+    @property
+    def subscribed_centrals(self) -> Set[str]:
+        return set(
+            [client.session.device_id.id for client in self.obj.subscribed_clients]
+        )

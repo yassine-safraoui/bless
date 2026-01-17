@@ -1,10 +1,11 @@
-from enum import Flag
+import logging
+
 from uuid import UUID
-from typing import Union, Optional, Dict
+from typing import Dict, Optional, Set, Union
 
 from CoreBluetooth import CBUUID, CBMutableCharacteristic  # type: ignore
 
-from bleak.backends.characteristic import (  # type: ignore
+from bleak.backends.characteristic import (
     BleakGATTCharacteristic,
 )
 from bleak.backends.descriptor import BleakGATTDescriptor  # type: ignore
@@ -15,14 +16,12 @@ from bless.backends.characteristic import (
     GATTCharacteristicProperties,
     GATTAttributePermissions,
     BlessGATTCharacteristic as BaseBlessGATTCharacteristic,
+    GATTReadCallback,
+    GATTWriteCallback,
+    GATTSubscribeCallback,
 )
 
-
-class CBAttributePermissions(Flag):
-    readable = 0x1
-    writeable = 0x2
-    read_encryption_required = 0x4
-    write_encryption_required = 0x8
+logger = logging.getLogger(__name__)
 
 
 class BlessGATTCharacteristicCoreBluetooth(
@@ -38,6 +37,10 @@ class BlessGATTCharacteristicCoreBluetooth(
         properties: GATTCharacteristicProperties,
         permissions: GATTAttributePermissions,
         value: Optional[bytearray],
+        on_read: Optional[GATTReadCallback] = None,
+        on_write: Optional[GATTWriteCallback] = None,
+        on_subscribe: Optional[GATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[GATTSubscribeCallback] = None,
     ):
         """
         Instantiates a new GATT Characteristic but is not yet assigned to any
@@ -54,8 +57,35 @@ class BlessGATTCharacteristicCoreBluetooth(
             Permissions that define the protection levels of the properties
         value : Optional[bytearray]
             The binary value of the characteristic
+        on_read : Optional[GATTReadCallback]
+            If defined, reads destined for this characteristic will be passed
+            to this function
+        on_write : Optional[GATTWriteCallback]
+            If defined, writes destined for this characteristic will be passed
+            to this function
+        on_subscribe : Optional[GATTSubscribeCallback]
+            If defined, subscriptions destined for this characteristic will be
+            passed to this function
+        on_unsubscribe : Optional[GATTSubscribeCallback]
+            If defined, unsubscriptions destined for this characteristic will
+            be passed to this function
         """
-        BaseBlessGATTCharacteristic.__init__(self, uuid, properties, permissions, value)
+        BaseBlessGATTCharacteristic.__init__(
+            self,
+            uuid,
+            properties,
+            permissions,
+            value,
+            on_read,
+            on_write,
+            on_subscribe,
+            on_unsubscribe,
+        )
+        if value is not None and on_read is not None:
+            logger.warning(
+                "On CoreBluetooth, "
+                + "callbacks are only triggered if the value is initialized to None"
+            )
         self._descriptors: Dict[int, BleakGATTDescriptor] = {}
         self._cb_characteristic: Optional[CBMutableCharacteristic] = None
 
@@ -120,3 +150,12 @@ class BlessGATTCharacteristicCoreBluetooth(
         if self._cb_characteristic is not None:
             cb_char: CBMutableCharacteristic = self._cb_characteristic
             cb_char.setValue_(val)
+
+    @property
+    def subscribed_centrals(self) -> Set[str]:
+        return set(
+            [
+                central.identifier().UUIDString()
+                for central in self.obj.subscribedCentrals()
+            ]
+        )

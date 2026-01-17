@@ -17,6 +17,7 @@ setuptools.setup(
     include_package_data=True,
     install_requires=[
         "bleak>=1.1.1",  # Updated to require Bleak v1.1.1+
+        "coloredlogs",
         "pywin32;platform_system=='Windows'",
         "dbus_next;platform_system=='Linux'",
         (

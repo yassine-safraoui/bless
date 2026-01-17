@@ -25,6 +25,8 @@ from bless.backends.attribute import (  # noqa: E402
 from bless.backends.characteristic import (  # noqa: E402
     GATTCharacteristicProperties,
 )
+from bless.backends.request import BlessGATTRequest
+from bless.backends.session import BlessGATTSession
 
 hardware_only = pytest.mark.skipif("os.environ.get('TEST_HARDWARE') != '1'")
 use_encrypted = os.environ.get("TEST_ENCRYPTED") is not None
@@ -102,17 +104,29 @@ class TestBlessServer:
         assert server.services[service_uuid].get_characteristic(char_uuid)
 
         # Set up read, write, and subscribe callbacks
-        def read(characteristic: BlessGATTCharacteristic) -> bytearray:
+        def read(
+            characteristic: BlessGATTCharacteristic, request: BlessGATTRequest
+        ) -> bytearray:
+            print(f"Read request: {request}")
             return characteristic.value
 
-        def write(characteristic: BlessGATTCharacteristic, value: bytearray):
+        def write(
+            characteristic: BlessGATTCharacteristic,
+            value: bytearray,
+            request: BlessGATTRequest,
+        ) -> None:
+            print(f"Write request: {request}")
             characteristic.value = value  # type: ignore
 
-        def subscribe(characteristic: BlessGATTCharacteristic) -> None:
-            print("Subscribed")
+        def subscribe(
+            characteristic: BlessGATTCharacteristic, session: BlessGATTSession
+        ) -> None:
+            print(f"Subscribed to session: {session}")
 
-        def unsubscribe(characteristic: BlessGATTCharacteristic) -> None:
-            print("Unsubscribed")
+        def unsubscribe(
+            characteristic: BlessGATTCharacteristic, session: BlessGATTSession
+        ) -> None:
+            print(f"Unsubscribed to session: {session}")
 
         server.on_read = read
         server.on_write = write

@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from typing import Union, Optional, List, Dict, cast, TYPE_CHECKING, Literal
+from typing import Dict, List, Literal, Optional, Set, TYPE_CHECKING, Union, cast
 
 from bleak.backends.characteristic import (  # type: ignore
     BleakGATTCharacteristic,
@@ -11,6 +11,9 @@ from bless.backends.attribute import GATTAttributePermissions
 from bless.backends.characteristic import (
     BlessGATTCharacteristic,
     GATTCharacteristicProperties,
+    GATTReadCallback,
+    GATTWriteCallback,
+    GATTSubscribeCallback,
 )
 from bless.backends.bluezdbus.dbus.characteristic import (
     Flags,
@@ -42,6 +45,7 @@ class BlessGATTCharacteristicBlueZDBus(
     """
     BlueZ implementation of the BlessGATTCharacteristic
     """
+
     gatt: "BlueZGattCharacteristic"
 
     def __init__(
@@ -50,6 +54,10 @@ class BlessGATTCharacteristicBlueZDBus(
         properties: GATTCharacteristicProperties,
         permissions: GATTAttributePermissions,
         value: Optional[bytearray],
+        on_read: Optional[GATTReadCallback] = None,
+        on_write: Optional[GATTWriteCallback] = None,
+        on_subscribe: Optional[GATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[GATTSubscribeCallback] = None,
     ):
         """
         Instantiates a new GATT Characteristic but is not yet assigned to any
@@ -66,9 +74,31 @@ class BlessGATTCharacteristicBlueZDBus(
             Permissions that define the protection levels of the properties
         value : Optional[bytearray]
             The binary value of the characteristic
+        on_read : Optional[GATTReadCallback]
+            If defined, reads destined for this characteristic will be passed
+            to this function
+        on_write : Optional[GATTWriteCallback]
+            If defined, writes destined for this characteristic will be passed
+            to this function
+        on_subscribe : Optional[GATTSubscribeCallback]
+            If defined, subscriptions destined for this characteristic will be
+            passed to this function
+        on_unsubscribe : Optional[GATTSubscribeCallback]
+            If defined, unsubscriptions destined for this characteristic will
+            be passed to this function
         """
         value = value if value is not None else bytearray(b"")
-        BlessGATTCharacteristic.__init__(self, uuid, properties, permissions, value)
+        BlessGATTCharacteristic.__init__(
+            self,
+            uuid,
+            properties,
+            permissions,
+            value,
+            on_read,
+            on_write,
+            on_subscribe,
+            on_unsubscribe,
+        )
         self._value = value
         self._descriptors: Dict[int, BleakGATTDescriptor] = {}
 
@@ -141,6 +171,10 @@ class BlessGATTCharacteristicBlueZDBus(
     def description(self) -> str:
         """Description of this characteristic"""
         return f"Characteristic {self._uuid}"
+
+    @property
+    def subscribed_centrals(self) -> Set[str]:
+        return set(list(self.obj._subscribed_centrals.keys()))
 
 
 def transform_flags_with_permissions(

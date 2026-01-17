@@ -21,3 +21,12 @@ DBus APIs.
 
 .. automodule:: bless.backends.bluezdbus.dbus.advertisement
    :members:
+
+.. automodule:: bless.backends.bluezdbus.request
+   :members:
+
+.. automodule:: bless.backends.bluezdbus.session
+   :members:
+
+.. automodule:: bless.backends.bluezdbus.dbus.session
+   :members:

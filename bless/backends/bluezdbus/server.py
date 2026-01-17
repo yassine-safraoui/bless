@@ -16,10 +16,11 @@ from bless.backends.bluezdbus.descriptor import BlessGATTDescriptorBlueZDBus
 from bless.backends.bluezdbus.dbus.application import (  # type: ignore
     BlueZGattApplication,
 )
-from bless.backends.bluezdbus.dbus.utils import get_adapter  # type: ignore
 from bless.backends.bluezdbus.dbus.characteristic import (  # type: ignore
     BlueZGattCharacteristic,
 )
+from bless.backends.bluezdbus.dbus.session import NotifySession
+from bless.backends.bluezdbus.dbus.utils import get_adapter  # type: ignore
 
 from bless.backends.bluezdbus.service import BlessGATTServiceBlueZDBus
 
@@ -29,6 +30,9 @@ from bless.backends.attribute import (  # type: ignore
 
 from bless.backends.characteristic import (  # type: ignore
     GATTCharacteristicProperties,
+    GATTReadCallback,
+    GATTWriteCallback,
+    GATTSubscribeCallback,
 )
 
 from bless.backends.descriptor import (  # type: ignore
@@ -36,6 +40,9 @@ from bless.backends.descriptor import (  # type: ignore
 )
 
 from bleak.uuids import normalize_uuid_str
+
+from .request import BlessGATTRequestBlueZ
+from .session import BlessGATTSessionBlueZ
 
 
 class BlessServerBlueZDBus(BaseBlessServer):
@@ -68,10 +75,10 @@ class BlessServerBlueZDBus(BaseBlessServer):
             self.name,
             "org.bluez",
             self.bus,
-            self.read,
-            self.write,
-            self.subscribe,
-            self.unsubscribe,
+            self.__on_read,
+            self.__on_write,
+            self.__on_subscribe,
+            self.__on_unsubscribe,
         )
 
         potential_adapter: Optional[ProxyObject] = await get_adapter(
@@ -133,17 +140,6 @@ class BlessServerBlueZDBus(BaseBlessServer):
 
         return True
 
-    async def is_connected(self) -> bool:
-        """
-        Determine whether there are any connected peripheral devices
-
-        Returns
-        -------
-        bool
-            Whether any peripheral devices are connected
-        """
-        return await self.app.is_connected()
-
     async def is_advertising(self) -> bool:
         """
         Determine whether the server is advertising
@@ -181,6 +177,10 @@ class BlessServerBlueZDBus(BaseBlessServer):
         properties: GATTCharacteristicProperties,
         value: Optional[bytearray],
         permissions: GATTAttributePermissions,
+        on_read: Optional[GATTReadCallback] = None,
+        on_write: Optional[GATTWriteCallback] = None,
+        on_subscribe: Optional[GATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[GATTSubscribeCallback] = None,
     ):
         """
         Add a new characteristic to be associated with the server
@@ -200,13 +200,34 @@ class BlessServerBlueZDBus(BaseBlessServer):
         permissions : int
             GATT Characteristic flags that define the permissions for the
             characteristic
+        on_read : Optional[GATTReadCallback]
+            If defined, reads destined for this characteristic will be passed
+            to this function
+        on_write : Optional[GATTWriteCallback]
+            If defined, writes destined for this characteristic will be passed
+            to this function
+        on_subscribe : Optional[GATTSubscribeCallback]
+            If defined, subscriptions destined for this characteristic will be
+            passed to this function
+        on_unsubscribe : Optional[GATTSubscribeCallback]
+            If defined, unsubscriptions destined for this characteristic will
+            be passed to this function
         """
         await self.setup_task
         service: BlessGATTServiceBlueZDBus = cast(
             BlessGATTServiceBlueZDBus, self.services[str(UUID(service_uuid))]
         )
         characteristic: BlessGATTCharacteristicBlueZDBus = (
-            BlessGATTCharacteristicBlueZDBus(char_uuid, properties, permissions, value)
+            BlessGATTCharacteristicBlueZDBus(
+                char_uuid,
+                properties,
+                permissions,
+                value,
+                on_read,
+                on_write,
+                on_subscribe,
+                on_unsubscribe,
+            )
         )
         await characteristic.init(service)
 
@@ -302,7 +323,9 @@ class BlessServerBlueZDBus(BaseBlessServer):
         characteristic.update_value()
         return True
 
-    def read(self, char: BlueZGattCharacteristic, options: Dict[str, Any]) -> bytes:
+    def __on_read(
+        self, char: BlueZGattCharacteristic, options: Dict[str, Any]
+    ) -> bytes:
         """
         Read request.
         This re-routes the the request incomming on the dbus to the server to
@@ -320,11 +343,11 @@ class BlessServerBlueZDBus(BaseBlessServer):
         bytes
             The value of the characteristic
         """
-        return bytes(self.read_request(char.UUID, options))
+        return bytes(self._on_read(char.UUID, BlessGATTRequestBlueZ(options)))
 
-    def write(
+    def __on_write(
         self, char: BlueZGattCharacteristic, value: bytes, options: Dict[str, Any]
-    ):
+    ) -> None:
         """
         Write request.
         This function re-routes the write request sent from the
@@ -338,9 +361,13 @@ class BlessServerBlueZDBus(BaseBlessServer):
         value : bytearray
             The value being requested to set
         """
-        return self.write_request(char.UUID, bytearray(value), options)
+        return self.write_request(
+            char.UUID, bytearray(value), BlessGATTRequestBlueZ(options)
+        )
 
-    def subscribe(self, char: BlueZGattCharacteristic, options: Dict[str, Any]):
+    def __on_subscribe(
+        self, char: BlueZGattCharacteristic, session: NotifySession
+    ) -> None:
         """
         Subscribe request.
         This function re-routes the subscribe request sent from the
@@ -352,10 +379,11 @@ class BlessServerBlueZDBus(BaseBlessServer):
         char : BlueZGattCharacteristic
             The characteristic object involved in the request
         """
-        options["central_id"] = options.get("device")
-        return self.subscribe_request(char.UUID, options)
+        return self.subscribe_request(char.UUID, BlessGATTSessionBlueZ(session))
 
-    def unsubscribe(self, char: BlueZGattCharacteristic, options: Dict[str, Any]):
+    def __on_unsubscribe(
+        self, char: BlueZGattCharacteristic, session: NotifySession
+    ) -> None:
         """
         Unsubscribe request.
         This function re-routes the unsubscribe request sent from the
@@ -367,5 +395,4 @@ class BlessServerBlueZDBus(BaseBlessServer):
         char : BlueZGattCharacteristic
             The characteristic object involved in the request
         """
-        options["central_id"] = options.get("device")
-        return self.unsubscribe_request(char.UUID, options)
+        return self.unsubscribe_request(char.UUID, BlessGATTSessionBlueZ(session))

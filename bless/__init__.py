@@ -13,12 +13,17 @@ elif sys.platform == "darwin":
 
     # Service
     from bless.backends.corebluetooth.service import (  # noqa: F401
-        BlessGATTServiceCoreBluetooth as BlessGATTService
+        BlessGATTServiceCoreBluetooth as BlessGATTService,
     )
 
     # Characteristic Classes
     from bless.backends.corebluetooth.characteristic import (  # noqa: F401
         BlessGATTCharacteristicCoreBluetooth as BlessGATTCharacteristic,
+    )
+
+    # Descriptor Classes
+    from bless.backends.corebluetooth.descriptor import (  # noqa: F401
+        BlessGATTDescriptorCoreBluetooth as BlessGATTDescriptor,
     )
 
 elif sys.platform == "linux":
@@ -30,7 +35,7 @@ elif sys.platform == "linux":
 
     # Service
     from bless.backends.bluezdbus.service import (  # noqa: F401
-        BlessGATTServiceBlueZDBus as BlessGATTService
+        BlessGATTServiceBlueZDBus as BlessGATTService,
     )
 
     # Characteristic Classes
@@ -52,7 +57,7 @@ elif sys.platform == "win32":
 
     # Service
     from bless.backends.winrt.service import (  # noqa: F401
-        BlessGATTServiceWinRT as BlessGATTService
+        BlessGATTServiceWinRT as BlessGATTService,
     )
 
     # Characteristic Classes
@@ -60,20 +65,20 @@ elif sys.platform == "win32":
         BlessGATTCharacteristicWinRT as BlessGATTCharacteristic,
     )
 
-# type: ignore
 from bless.backends.attribute import (  # noqa: E402 F401
     GATTAttributePermissions,
 )
 
-# type: ignore
 from bless.backends.characteristic import (  # noqa: E402 F401
     GATTCharacteristicProperties,
 )
 
-# type: ignore
 from bless.backends.descriptor import (  # noqa: E402 F401
     GATTDescriptorProperties,
 )
+
+from bless.backends.request import BlessGATTRequest  # noqa: F401
+from bless.backends.session import BlessGATTSession  # noqa: F401
 
 
 def check_test() -> bool:

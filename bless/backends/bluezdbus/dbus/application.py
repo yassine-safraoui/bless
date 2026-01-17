@@ -23,11 +23,13 @@ from bless.backends.bluezdbus.dbus.characteristic import (  # type: ignore
 )
 from bless.backends.bluezdbus.dbus.descriptor import BlueZGattDescriptor  # type: ignore
 
+from .session import NotifySession
+
 LOGGER = logging.getLogger(__name__)
 
 ReadCallback = Callable[[BlueZGattCharacteristic, Dict[str, Any]], bytes]
 WriteCallback = Callable[[BlueZGattCharacteristic, bytes, Dict[str, Any]], None]
-SubscribeCallback = Callable[[BlueZGattCharacteristic, Dict[str, Any]], None]
+SubscribeCallback = Callable[[BlueZGattCharacteristic, NotifySession], None]
 
 
 class BlueZGattApplication(ServiceInterface):

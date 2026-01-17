@@ -1,5 +1,7 @@
 from bleak.backends.bluezdbus.defs import DEVICE_INTERFACE
+from dbus_next.aio import MessageBus, ProxyInterface, ProxyObject  # type: ignore
 from dbus_next.constants import PropertyAccess  # type: ignore
+from dbus_next.introspection import Interface, Node  # type: ignore
 from dbus_next.service import ServiceInterface, method, dbus_property  # type: ignore
 
 
@@ -144,4 +146,18 @@ class Device1(ServiceInterface):
 
     @dbus_property(access=PropertyAccess.READ)
     def AdvertisingFlags(self) -> "ay":  # type: ignore # noqa: F722 F821
+        raise NotImplementedError
+
+    @classmethod
+    def get_device(cls, bus: MessageBus, path: str) -> ProxyInterface:
+        # Query the device object
+        node: Node = Node.default(name=path)
+        device_iface: Interface = Device1().introspect()
+        node.interfaces.append(device_iface)
+
+        object: ProxyObject = bus.get_proxy_object("org.bluez", path, node)
+        return object.get_interface(DEVICE_INTERFACE)
+
+    # For typing
+    async def get_address(self) -> str:
         raise NotImplementedError

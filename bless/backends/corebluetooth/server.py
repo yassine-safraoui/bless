@@ -7,12 +7,14 @@ from asyncio import TimeoutError
 from asyncio.events import AbstractEventLoop
 
 from CoreBluetooth import (  # type: ignore
-    CBService,
-    CBPeripheralManager,
-    CBMutableCharacteristic,
-    CBMutableDescriptor,
     CBAdvertisementDataLocalNameKey,
     CBAdvertisementDataServiceUUIDsKey,
+    CBATTRequest,
+    CBCentral,
+    CBMutableCharacteristic,
+    CBMutableDescriptor,
+    CBPeripheralManager,
+    CBService,
     CBUUID,
 )
 
@@ -38,7 +40,12 @@ from bless.backends.attribute import (
 )
 from bless.backends.characteristic import (
     GATTCharacteristicProperties,
+    GATTReadCallback,
+    GATTWriteCallback,
+    GATTSubscribeCallback,
 )
+from .request import BlessGATTRequestCoreBluetooth
+from .session import BlessGATTSessionCoreBluetooth
 
 
 logger = logging.getLogger(name=__name__)
@@ -71,10 +78,10 @@ class BlessServerCoreBluetooth(BaseBlessServer):
         ) = PeripheralManagerDelegate.alloc().init(
             self,
             {
-                "read": self.read_request,
-                "write": self.write_request,
-                "subscribe": self.subscribe_request,
-                "unsubscribe": self.unsubscribe_request,
+                "read": self.__on_read,
+                "write": self.__on_write,
+                "subscribe": self.__on_subscribe,
+                "unsubscribe": self.__on_unsubscribe,
             },
         )
 
@@ -148,18 +155,6 @@ class BlessServerCoreBluetooth(BaseBlessServer):
         """
         await self.peripheral_manager_delegate.stop_advertising()
 
-    async def is_connected(self) -> bool:
-        """
-        Determine whether there are any connected central devices
-
-        Returns
-        -------
-        bool
-            True if there are central devices that are connected
-        """
-        n_subscriptions = len(self.peripheral_manager_delegate._central_subscriptions)
-        return n_subscriptions > 0
-
     async def is_advertising(self) -> bool:
         """
         Determine whether the service is advertising
@@ -197,6 +192,10 @@ class BlessServerCoreBluetooth(BaseBlessServer):
         properties: GATTCharacteristicProperties,
         value: Optional[bytearray],
         permissions: GATTAttributePermissions,
+        on_read: Optional[GATTReadCallback] = None,
+        on_write: Optional[GATTWriteCallback] = None,
+        on_subscribe: Optional[GATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[GATTSubscribeCallback] = None,
     ):
         """
         Generate a new characteristic to be associated with the server
@@ -215,12 +214,31 @@ class BlessServerCoreBluetooth(BaseBlessServer):
             The initial value for the characteristic
         permissions : GATTAttributePermissions
             The permissions for the characteristic
+        on_read : Optional[GATTReadCallback]
+            If defined, reads destined for this characteristic will be passed
+            to this function
+        on_write : Optional[GATTWriteCallback]
+            If defined, writes destined for this characteristic will be passed
+            to this function
+        on_subscribe : Optional[GATTSubscribeCallback]
+            If defined, subscriptions destined for this characteristic will be
+            passed to this function
+        on_unsubscribe : Optional[GATTSubscribeCallback]
+            If defined, unsubscriptions destined for this characteristic will
+            be passed to this function
         """
         service_uuid = str(UUID(service_uuid))
         logger.debug("Creating a new characteristic with uuid: {}".format(char_uuid))
         characteristic: BlessGATTCharacteristicCoreBluetooth = (
             BlessGATTCharacteristicCoreBluetooth(
-                char_uuid, properties, permissions, value
+                char_uuid,
+                properties,
+                permissions,
+                value,
+                on_read,
+                on_write,
+                on_subscribe,
+                on_unsubscribe,
             )
         )
 
@@ -298,3 +316,15 @@ class BlessServerCoreBluetooth(BaseBlessServer):
         )
 
         return result
+
+    def __on_read(self, uuid: str, request: CBATTRequest) -> bytearray:
+        return self._on_read(uuid, BlessGATTRequestCoreBluetooth(request))
+
+    def __on_write(self, uuid: str, value: bytearray, request: CBATTRequest) -> None:
+        return self._on_write(uuid, value, BlessGATTRequestCoreBluetooth(request))
+
+    def __on_subscribe(self, uuid: str, central: CBCentral) -> None:
+        return self._on_subscribe(uuid, BlessGATTSessionCoreBluetooth(central))
+
+    def __on_unsubscribe(self, uuid: str, central: CBCentral) -> None:
+        return self._on_unsubscribe(uuid, BlessGATTSessionCoreBluetooth(central))

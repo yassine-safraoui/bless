@@ -1,8 +1,9 @@
 import abc
+import logging
 
 from enum import Flag
 from uuid import UUID
-from typing import List, Optional, Set, Union, TYPE_CHECKING, cast
+from typing import Callable, List, Optional, Set, Union, TYPE_CHECKING, cast
 
 from bleak.backends.characteristic import (  # type: ignore
     BleakGATTCharacteristic,
@@ -10,10 +11,18 @@ from bleak.backends.characteristic import (  # type: ignore
 )
 
 from .attribute import GATTAttributePermissions
+from .request import BlessGATTRequest
+from .session import BlessGATTSession
 
 if TYPE_CHECKING:
     from bless.backends.service import BlessGATTService
     from bless.backends.descriptor import BlessGATTDescriptor
+
+logger = logging.getLogger(__name__)
+
+GATTReadCallback = Callable[["BlessGATTCharacteristic", BlessGATTRequest], bytearray]
+GATTWriteCallback = Callable[["BlessGATTCharacteristic", bytes, BlessGATTRequest], None]
+GATTSubscribeCallback = Callable[["BlessGATTCharacteristic", BlessGATTSession], None]
 
 
 class GATTCharacteristicProperties(Flag):
@@ -67,6 +76,10 @@ class BlessGATTCharacteristic(BleakGATTCharacteristic):
         properties: GATTCharacteristicProperties,
         permissions: GATTAttributePermissions,
         value: Optional[bytearray],
+        on_read: Optional[GATTReadCallback] = None,
+        on_write: Optional[GATTWriteCallback] = None,
+        on_subscribe: Optional[GATTSubscribeCallback] = None,
+        on_unsubscribe: Optional[GATTSubscribeCallback] = None,
     ):
         """
         Instantiates a new GATT Characteristic but is not yet assigned to any
@@ -83,7 +96,25 @@ class BlessGATTCharacteristic(BleakGATTCharacteristic):
             Permissions that define the protection levels of the properties
         value : Optional[bytearray]
             The binary value of the characteristic
+        on_read : Optional[GATTReadCallback]
+            If defined, reads destined for this characteristic will be passed
+            to this function
+        on_write : Optional[GATTWriteCallback]
+            If defined, writes destined for this characteristic will be passed
+            to this function
+        on_subscribe : Optional[GATTSubscribeCallback]
+            If defined, subscriptions destined for this characteristic will be
+            passed to this function
+        on_unsubscribe : Optional[GATTSubscribeCallback]
+            If defined, unsubscriptions destined for this characteristic will
+            be passed to this function
         """
+        self.on_read: Optional[GATTReadCallback] = on_read
+        self.on_write: Optional[GATTWriteCallback] = on_write
+        self.on_subscribe: Optional[GATTSubscribeCallback] = on_subscribe
+        self.on_unsubscribe: Optional[GATTSubscribeCallback] = on_unsubscribe
+
+        logger.debug(f"With on_read: {on_read}")
         if type(uuid) is str:
             uuid_str: str = cast(str, uuid)
             uuid = UUID(uuid_str)
@@ -94,7 +125,6 @@ class BlessGATTCharacteristic(BleakGATTCharacteristic):
         )
         self._permissions: GATTAttributePermissions = permissions
         self._initial_value: Optional[bytearray] = value
-        self._subscribed_centrals: Set[str] = set()
 
     def __str__(self):
         """
@@ -133,10 +163,4 @@ class BlessGATTCharacteristic(BleakGATTCharacteristic):
         """
         Unique list of subscribed central IDs
         """
-        return self._subscribed_centrals
-
-    def add_subscription(self, central_id: str):
-        self._subscribed_centrals.add(central_id)
-
-    def remove_subscription(self, central_id: str):
-        self._subscribed_centrals.discard(central_id)
+        raise NotImplementedError
