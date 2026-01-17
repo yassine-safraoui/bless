@@ -11,3 +11,4 @@ twisted; platform_system == "Linux"
 dbus-next; platform_system == "Linux"
 git+https://github.com/gwangyi/pysetupdi; platform_system == "Windows"
 pywin32; platform_system == "Windows"
+coloredlogs
