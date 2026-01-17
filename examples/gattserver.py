@@ -5,7 +5,6 @@ characteristics
 
 import asyncio
 import logging
-import inspect
 import sys
 import threading
 
