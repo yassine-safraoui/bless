@@ -128,19 +128,19 @@ class BlueZGattCharacteristic(ServiceInterface):
         bytes
             The bytes that is the value of the characteristic
         """
-        device_path: str = options["device"]
+        device_path: str = options["device"].value
         device_interface: ProxyInterface = Device1.get_device(
             self._service.bus, device_path
         )
         device: Device1 = cast(Device1, device_interface)
-        options["central_id"] = await device.get_address()
+        options["central_id"] = Variant("s", await device.get_address())
         f = self._service.app.Read
         if f is None:
             raise NotImplementedError()
         return f(self, options)
 
     @method()  # noqa: F722
-    def WriteValue(self, value: "ay", options: "a{sv}"):  # type: ignore # noqa
+    async def WriteValue(self, value: "ay", options: "a{sv}"):  # type: ignore # noqa
         """
         Write a value to the characteristic
         This is to be fully implemented at the application level
@@ -152,12 +152,12 @@ class BlueZGattCharacteristic(ServiceInterface):
         options : Dict
             Some options for you to select from
         """
-        device_path: str = options["device"]
+        device_path: str = options["device"].value
         device_interface: ProxyInterface = Device1.get_device(
             self._service.bus, device_path
         )
         device: Device1 = cast(Device1, device_interface)
-        options["central_id"] = device.get_address()
+        options["central_id"] = Variant("s", await device.get_address())
         f = self._service.app.Write
         if f is None:
             raise NotImplementedError()
@@ -212,7 +212,7 @@ class BlueZGattCharacteristic(ServiceInterface):
         del self._subscribed_centrals[address]
 
     @method()
-    def StartNotify(self):  # noqa: N802
+    async def StartNotify(self):  # noqa: N802
         """
         Begin a subscription to the characteristic
         """

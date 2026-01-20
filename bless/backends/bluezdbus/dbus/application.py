@@ -27,8 +27,9 @@ from .session import NotifySession
 
 LOGGER = logging.getLogger(__name__)
 
-ReadCallback = Callable[[BlueZGattCharacteristic, Dict[str, Any]], bytes]
-WriteCallback = Callable[[BlueZGattCharacteristic, bytes, Dict[str, Any]], None]
+BlueZOptions = Dict[str, Variant]
+ReadCallback = Callable[[BlueZGattCharacteristic, BlueZOptions], bytes]
+WriteCallback = Callable[[BlueZGattCharacteristic, bytes, BlueZOptions], None]
 SubscribeCallback = Callable[[BlueZGattCharacteristic, NotifySession], None]
 
 
