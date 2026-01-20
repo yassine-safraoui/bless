@@ -1,11 +1,12 @@
 from typing import Dict, Optional, cast
+from .dbus.application import BlueZOptions
 from ..request import BlessGATTRequest
 
 
 class BlessGATTRequestBlueZ(BlessGATTRequest):
 
     @property
-    def options(self) -> Dict:
+    def options(self) -> BlueZOptions:
         return cast(Dict, self.obj)
 
     @property
@@ -16,16 +17,16 @@ class BlessGATTRequestBlueZ(BlessGATTRequest):
         receving calls responsibility to use the DBus to resolve
         the device address and populate this field
         """
-        return self.obj["central_id"]
+        return self.obj["central_id"].value
 
     @property
     def mtu(self) -> int:
-        return self.obj["mtu"]
+        return self.obj["mtu"].value
 
     @property
     def offset(self) -> int:
-        return self.obj["offset"]
+        return 0 if "offset" not in self.obj else self.obj["offset"].value
 
     @property
     def response_requested(self) -> Optional[bool]:
-        return None if "type" not in self.obj else (self.obj["type"] == "request")
+        return None if "type" not in self.obj else (self.obj["type"].value == "request")

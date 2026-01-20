@@ -18,7 +18,7 @@ hardware_only = pytest.mark.skipif("os.environ.get('TEST_HARDWARE') is None")
 class TestUtils:
 
     @pytest.mark.asyncio
-    async def test_list_adapters(self):
+    async def test_list_adapters(self) -> None:
         bus: MessageBus = await MessageBus(bus_type=BusType.SYSTEM).connect()
         adapters: List[str] = await list_adapters(bus)
         assert len(adapters) > 0
