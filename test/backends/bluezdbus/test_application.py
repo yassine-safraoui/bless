@@ -43,7 +43,7 @@ class TestBlueZGattApplication:
     val: bytearray = bytearray([0])
 
     @pytest.mark.asyncio
-    async def test_init(self):
+    async def test_init(self) -> None:
 
         def read(char: BlueZGattCharacteristic, options: Dict[str, Any]) -> bytes:
             return bytes(self.val)
