@@ -1,14 +1,14 @@
+import aioconsole  # type: ignore
+import pytest
 import sys
 import uuid
-import pytest
-import aioconsole  # type: ignore
 
 import numpy as np  # type: ignore
 
 if sys.platform.lower() != "linux":
     pytest.skip("Only for linux", allow_module_level=True)
 
-from typing import List, Optional, cast  # noqa: E402
+from typing import Any, Dict, List, Optional, cast  # noqa: E402
 
 from dbus_next.aio import MessageBus, ProxyObject  # noqa: E402
 from dbus_next.constants import BusType  # noqa: E402
@@ -17,6 +17,7 @@ from bless.backends.bluezdbus.dbus.characteristic import Flags  # type: ignore #
 from bless.backends.bluezdbus.dbus.utils import get_adapter  # type: ignore # noqa: E402 E501
 from bless.backends.bluezdbus.dbus.application import BlueZGattApplication  # type: ignore # noqa: E402 E501
 from bless.backends.bluezdbus.dbus.characteristic import BlueZGattCharacteristic  # type: ignore # noqa: E402 E501
+from bless.backends.bluezdbus.dbus.session import NotifySession  # type: ignore # noqa: E402 E501
 
 hardware_only = pytest.mark.skipif("os.environ.get('TEST_HARDWARE') is None")
 
@@ -26,40 +27,45 @@ class TestBlueZGattApplication:
     """
     Test
     """
+
     hex_words: List[str] = [
-            'DEAD', 'FACE', 'BABE',
-            'CAFE', 'FADE', 'BAD',
-            'DAD', 'ACE', 'BED'
-            ]
+        "DEAD",
+        "FACE",
+        "BABE",
+        "CAFE",
+        "FADE",
+        "BAD",
+        "DAD",
+        "ACE",
+        "BED",
+    ]
 
     val: bytearray = bytearray([0])
 
     @pytest.mark.asyncio
     async def test_init(self):
 
-        def read(char: BlueZGattCharacteristic) -> bytes:
+        def read(char: BlueZGattCharacteristic, options: Dict[str, Any]) -> bytes:
             return bytes(self.val)
 
-        def write(char: BlueZGattCharacteristic, value: bytes):
+        def write(char: BlueZGattCharacteristic, value: bytes, options: Dict[str, Any]):
             char._value = bytes(value)  # type: ignore
             self.val = bytearray(value)
 
-        def notify(char: BlueZGattCharacteristic):
+        def notify(char: BlueZGattCharacteristic, session: NotifySession):
             return
 
-        def stop_notify(char: BlueZGattCharacteristic):
+        def stop_notify(char: BlueZGattCharacteristic, session: NotifySession):
             return
 
-        bus: MessageBus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+        bus: MessageBus = await MessageBus(
+            bus_type=BusType.SYSTEM, negotiate_unix_fd=True
+        ).connect()
 
         # Create the app
         app: BlueZGattApplication = BlueZGattApplication(
-            "ble", "org.bluez", bus
+            "ble", "org.bluez", bus, read, write, notify, stop_notify
         )
-        app.Read = read
-        app.Write = write
-        app.StartNotify = notify  # type: ignore
-        app.StopNotify = stop_notify  # type: ignore
 
         # Add a service
         service_uuid: str = str(uuid.uuid4())
@@ -67,14 +73,8 @@ class TestBlueZGattApplication:
 
         # Add a characteristic
         char_uuid: str = str(uuid.uuid4())
-        flags: List[Flags] = [
-            Flags.READ,
-            Flags.WRITE,
-            Flags.NOTIFY
-        ]
-        await app.add_characteristic(
-            service_uuid, char_uuid, b'1', flags
-        )
+        flags: List[Flags] = [Flags.READ, Flags.WRITE, Flags.NOTIFY]
+        await app.add_characteristic(service_uuid, char_uuid, b"1", flags)
 
         # Validate the app
         bus.export(app.path, app)
@@ -119,48 +119,46 @@ class TestBlueZGattApplication:
         assert await app.is_connected() is False
 
         print(
-                "\nPlease connect now" +
-                "and subscribe to the characteristic {}..."
-                .format(char_uuid)
-                )
+            "\nPlease connect now"
+            + "and subscribe to the characteristic {}...".format(char_uuid)
+        )
         await aioconsole.ainput("Press enter when ready...")
 
         assert await app.is_connected() is True
 
         # Read test
         rng: np.random._generator.Generator = np.random.default_rng()
-        hex_val: str = ''.join(rng.choice(self.hex_words, 2, replace=False))
+        hex_val: str = "".join(rng.choice(self.hex_words, 2, replace=False))
         self.val = bytearray(
-                int(f"0x{hex_val}", 16).to_bytes(
-                    length=int(np.ceil(len(hex_val)/2)),
-                    byteorder='big'
-                    )
-                )
+            int(f"0x{hex_val}", 16).to_bytes(
+                length=int(np.ceil(len(hex_val) / 2)), byteorder="big"
+            )
+        )
 
         print("Trigger a read and enter the hex value you see below")
         entered_value = await aioconsole.ainput("Value: ")
         assert entered_value == hex_val
 
         # Write test
-        hex_val = ''.join(rng.choice(self.hex_words, 2, replace=False))
+        hex_val = "".join(rng.choice(self.hex_words, 2, replace=False))
         print(f"Set the characteristic to the following: {hex_val}")
         await aioconsole.ainput("Press enter when ready...")
-        str_val: str = ''.join([hex(x)[2:] for x in self.val]).upper()
+        str_val: str = "".join([hex(x)[2:] for x in self.val]).upper()
         assert str_val == hex_val
 
         # Notify test
-        hex_val = ''.join(rng.choice(self.hex_words, 2, replace=False))
+        hex_val = "".join(rng.choice(self.hex_words, 2, replace=False))
         self.val = bytearray(
-                int(f"0x{hex_val}", 16).to_bytes(
-                    length=int(np.ceil(len(hex_val)/2)),
-                    byteorder='big'
-                    )
-                )
+            int(f"0x{hex_val}", 16).to_bytes(
+                length=int(np.ceil(len(hex_val) / 2)), byteorder="big"
+            )
+        )
 
         print("A new value will be sent")
         await aioconsole.ainput("Press enter to receive the new value...")
 
         app.services[0].characteristics[0].Value = bytes(self.val)  # type: ignore
+        app.services[0].characteristics[0].update_value()
 
         new_value: str = await aioconsole.ainput("Enter the New value: ")
         assert new_value == hex_val
