@@ -309,7 +309,7 @@ class BaseBlessServer(abc.ABC):
             uuids and the attributes are the properties
         """
         for service_uuid, service_info in gatt_tree.items():
-            await self.add_new_service(service_uuid)
+            await self.add_new_service(service_uuid, primary=True)
             for char_uuid, char_info in service_info.items():
                 await self.add_new_characteristic(
                     service_uuid,
