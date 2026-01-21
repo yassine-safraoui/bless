@@ -66,6 +66,95 @@ class TestBlessServer:
     def byte_to_hex(self, b: bytearray) -> str:
         return "".join([hex(x)[2:] for x in b]).upper()
 
+    async def setup_callbacks_and_start(self, server: BlessServer) -> None:
+        # Set up read, write, and subscribe callbacks
+        def read(
+            characteristic: BlessGATTCharacteristic, request: BlessGATTRequest
+        ) -> bytearray:
+            print(f"Read request: {request}")
+            return characteristic.value
+
+        def write(
+            characteristic: BlessGATTCharacteristic,
+            value: bytes,
+            request: BlessGATTRequest,
+        ) -> None:
+            print(f"Write request: {request}")
+            characteristic.value = value  # type: ignore
+
+        def subscribe(
+            characteristic: BlessGATTCharacteristic, session: BlessGATTSession
+        ) -> None:
+            print(f"Subscribed to session: {session}")
+
+        def unsubscribe(
+            characteristic: BlessGATTCharacteristic, session: BlessGATTSession
+        ) -> None:
+            print(f"Unsubscribed to session: {session}")
+
+        server.on_read = read
+        server.on_write = write
+        server.on_subscribe = subscribe
+        server.on_unsubscribe = unsubscribe
+
+        # Start advertising
+        assert await server.is_advertising() is False
+
+        await server.start()
+
+        assert await server.is_advertising() is True
+
+    async def read_write_notify_tests_on(
+        self,
+        server: BlessServer,
+        svc_uuid: str,
+        char_uuid: str
+    ) -> None:
+        # Subscribe
+        assert await server.is_connected() is False
+
+        print(
+            "\nPlease connect to the computer and "
+            + f"subscribe to characteristic {char_uuid}"
+        )
+        await aioconsole.ainput("Press enter when ready...")
+
+        assert await server.is_connected() is True
+
+        # Read Test
+        hex_val: str = self.gen_hex_pairs()
+        server.get_characteristic(char_uuid).value = self.hex_to_byte(hex_val)
+        print(
+            "Trigger a read command and "
+            + "enter the capital letters you retrieve below"
+        )
+        entered_value = await aioconsole.ainput("Value: ")
+        assert entered_value == hex_val
+
+        # Write Test
+        hex_val = self.gen_hex_pairs()
+        print(f"Set the characteristic to this value: {hex_val}")
+        await aioconsole.ainput("Press enter when ready...")
+        entered_value = self.byte_to_hex(server.get_characteristic(char_uuid).value)
+        assert entered_value == hex_val
+
+        # Notify Test
+        hex_val = self.gen_hex_pairs()
+        server.get_characteristic(char_uuid).value = self.hex_to_byte(hex_val)
+
+        print("A new value will be notified on the phone")
+        await aioconsole.ainput("Press enter to receive the new value...")
+
+        server.update_value(svc_uuid, char_uuid)
+
+        new_value: str = await aioconsole.ainput("Enter the new value: ")
+        assert new_value == hex_val
+
+        # unsubscribe
+        print("Unsubscribe from the characteristic")
+        await aioconsole.ainput("Press enter when ready...")
+        assert await server.is_connected() is False
+
     @pytest.mark.asyncio
     async def test_server(self):
         # Initialize
@@ -103,87 +192,55 @@ class TestBlessServer:
 
         assert server.services[service_uuid].get_characteristic(char_uuid)
 
-        # Set up read, write, and subscribe callbacks
-        def read(
-            characteristic: BlessGATTCharacteristic, request: BlessGATTRequest
-        ) -> bytearray:
-            print(f"Read request: {request}")
-            return characteristic.value
+        await self.setup_callbacks_and_start(server)
+        await self.read_write_notify_tests_on(server, service_uuid, char_uuid)
 
-        def write(
-            characteristic: BlessGATTCharacteristic,
-            value: bytearray,
-            request: BlessGATTRequest,
-        ) -> None:
-            print(f"Write request: {request}")
-            characteristic.value = value  # type: ignore
-
-        def subscribe(
-            characteristic: BlessGATTCharacteristic, session: BlessGATTSession
-        ) -> None:
-            print(f"Subscribed to session: {session}")
-
-        def unsubscribe(
-            characteristic: BlessGATTCharacteristic, session: BlessGATTSession
-        ) -> None:
-            print(f"Unsubscribed to session: {session}")
-
-        server.on_read = read
-        server.on_write = write
-        server.on_subscribe = subscribe
-        server.on_unsubscribe = unsubscribe
-
-        # Start advertising
+        # Stop Advertising
+        await server.stop()
+        await asyncio.sleep(2)
         assert await server.is_advertising() is False
 
-        await server.start()
+    @pytest.mark.asyncio
+    async def test_server_add_gatt(self):
+        # Initialize
+        server: BlessServer = BlessServer("Test Server with a GATT Tree")
 
-        assert await server.is_advertising() is True
+        # setup a gatt tree
+        service1_uuid: str = str(uuid.uuid4())
+        service2_uuid: str = str(uuid.uuid4())
+        characteristic1_uuid: str = str(uuid.uuid4())
+        characteristic2_uuid: str = str(uuid.uuid4())
+        gatt_tree = {
+            service1_uuid: {
+                characteristic1_uuid: {
+                    "Properties": GATTCharacteristicProperties.read
+                    | GATTCharacteristicProperties.write
+                    | GATTCharacteristicProperties.notify,
+                    "Value": None,
+                    "Permissions": GATTAttributePermissions.readable
+                    | GATTAttributePermissions.writable,
+                }
+            },
+            service2_uuid: {
+                characteristic2_uuid: {
+                    "Properties": GATTCharacteristicProperties.read
+                    | GATTCharacteristicProperties.write
+                    | GATTCharacteristicProperties.notify,
+                    "Value": None,
+                    "Permissions": GATTAttributePermissions.readable
+                    | GATTAttributePermissions.writable,
+                }
+            }
+        }
 
-        # Subscribe
-        assert await server.is_connected() is False
-
-        print(
-            "\nPlease connect to the computer and "
-            + f"subscribe to characteristic {char_uuid}"
+        await server.add_gatt(gatt_tree)
+        assert len(server.services) == 2
+        await self.setup_callbacks_and_start(server)
+        await self.read_write_notify_tests_on(
+            server,
+            service2_uuid,
+            characteristic2_uuid
         )
-        await aioconsole.ainput("Press enter when ready...")
-
-        assert await server.is_connected() is True
-
-        # Read Test
-        hex_val: str = self.gen_hex_pairs()
-        server.get_characteristic(char_uuid).value = self.hex_to_byte(hex_val)
-        print(
-            "Trigger a read command and "
-            + "enter the capital letters you retrieve below"
-        )
-        entered_value = await aioconsole.ainput("Value: ")
-        assert entered_value == hex_val
-
-        # Write Test
-        hex_val = self.gen_hex_pairs()
-        print(f"Set the characteristic to this value: {hex_val}")
-        await aioconsole.ainput("Press enter when ready...")
-        entered_value = self.byte_to_hex(server.get_characteristic(char_uuid).value)
-        assert entered_value == hex_val
-
-        # Notify Test
-        hex_val = self.gen_hex_pairs()
-        server.get_characteristic(char_uuid).value = self.hex_to_byte(hex_val)
-
-        print("A new value will be notified on the phone")
-        await aioconsole.ainput("Press enter to receive the new value...")
-
-        server.update_value(service_uuid, char_uuid)
-
-        new_value: str = await aioconsole.ainput("Enter the new value: ")
-        assert new_value == hex_val
-
-        # unsubscribe
-        print("Unsubscribe from the characteristic")
-        await aioconsole.ainput("Press entery when ready...")
-        assert await server.is_connected() is False
 
         # Stop Advertising
         await server.stop()
