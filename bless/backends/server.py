@@ -23,7 +23,10 @@ from bless.backends.request import BlessGATTRequest
 
 from bless.exceptions import BlessError
 
-coloredlogs.install(level="DEBUG")
+coloredlogs.install(
+    level="DEBUG",
+    logger=logging.getLogger('bless')
+)
 LOGGER = logging.getLogger(__name__)
 
 
