@@ -21,7 +21,7 @@ setuptools.setup(
         "pywin32;platform_system=='Windows'",
         "dbus_next;platform_system=='Linux'",
         (
-            "pysetupdi @ git+https://github.com/gwangyi/pysetupdi#egg=pysetupdi;"
+            "pysetupdi @ git+https://github.com/gwangyi/pysetupdi ; "
             "platform_system=='Windows'"
         ),
         (
